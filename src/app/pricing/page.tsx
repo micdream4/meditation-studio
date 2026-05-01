@@ -42,14 +42,19 @@ const FAQ = [
 ];
 
 const IS_TEST_CHECKOUT = process.env.NEXT_PUBLIC_CREEM_MODE !== "live";
+type BillingPlan = "monthly" | "yearly";
 
 export default function PricingPage() {
-  const [billing, setBilling] = useState<"monthly" | "yearly">("yearly");
-  const [loading, setLoading] = useState<"monthly" | "yearly" | null>(null);
+  const [billing, setBilling] = useState<BillingPlan>("yearly");
+  const [loading, setLoading] = useState<BillingPlan | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const checkoutPlan: BillingPlan = IS_TEST_CHECKOUT ? "monthly" : billing;
+  const features = IS_TEST_CHECKOUT
+    ? FEATURES.filter((feature) => !feature.label.startsWith("Yearly:"))
+    : FEATURES;
 
-  async function handleCheckout(plan: "monthly" | "yearly") {
+  async function handleCheckout(plan: BillingPlan) {
     setLoading(plan);
     setCheckoutError(null);
     try {
@@ -120,34 +125,34 @@ export default function PricingPage() {
         {/* ── Billing toggle + Cards ── */}
         <section className="max-w-xl mx-auto px-6 pb-20">
 
-          {/* Toggle */}
-          <div className="flex justify-center mb-10">
-            <div
-              className="relative grid grid-cols-2 items-center p-1 rounded-full text-sm w-[320px] max-w-full"
-              style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
-            >
-              {/* Sliding background pill */}
+          {!IS_TEST_CHECKOUT && (
+            <div className="flex justify-center mb-10">
               <div
-                className="absolute top-1 bottom-1 rounded-full transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
-                style={{
-                  background: "linear-gradient(135deg, #78a07e 0%, #5a7a60 100%)",
-                  boxShadow: "0 2px 10px rgba(107,143,113,0.3)",
-                  left: billing === "monthly" ? "4px" : "calc(50% + 2px)",
-                  width: "calc(50% - 6px)",
-                }}
-              />
-              {(["monthly", "yearly"] as const).map((b) => (
-                <button
-                  key={b}
-                  onClick={() => setBilling(b)}
-                  className="relative z-10 py-2 rounded-full font-medium transition-colors duration-200 text-center"
-                  style={{ color: billing === b ? "#fff" : "var(--color-text-muted)" }}
-                >
-                  {b === "monthly" ? "Monthly" : "Yearly"}
-                </button>
-              ))}
+                className="relative grid grid-cols-2 items-center p-1 rounded-full text-sm w-[320px] max-w-full"
+                style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
+              >
+                <div
+                  className="absolute top-1 bottom-1 rounded-full transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
+                  style={{
+                    background: "linear-gradient(135deg, #78a07e 0%, #5a7a60 100%)",
+                    boxShadow: "0 2px 10px rgba(107,143,113,0.3)",
+                    left: billing === "monthly" ? "4px" : "calc(50% + 2px)",
+                    width: "calc(50% - 6px)",
+                  }}
+                />
+                {(["monthly", "yearly"] as const).map((b) => (
+                  <button
+                    key={b}
+                    onClick={() => setBilling(b)}
+                    className="relative z-10 py-2 rounded-full font-medium transition-colors duration-200 text-center"
+                    style={{ color: billing === b ? "#fff" : "var(--color-text-muted)" }}
+                  >
+                    {b === "monthly" ? "Monthly" : "Yearly"}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Price display */}
           <div className="text-center mb-10">
@@ -156,7 +161,7 @@ export default function PricingPage() {
                 className="inline-block mb-3 text-xs px-3 py-1 rounded-full font-medium"
                 style={{ background: "rgba(192,122,90,0.1)", color: "var(--color-accent-warm)" }}
               >
-                Test checkout · $1
+                Test checkout · $1/month
               </div>
             )}
             <div className="flex items-end justify-center gap-2">
@@ -168,14 +173,14 @@ export default function PricingPage() {
               </span>
               <div className="pb-3 text-left">
                 <div className="text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
-                  {IS_TEST_CHECKOUT ? "test" : billing === "monthly" ? "/month" : "/year"}
+                  {IS_TEST_CHECKOUT ? "/month test" : billing === "monthly" ? "/month" : "/year"}
                 </div>
                 {!IS_TEST_CHECKOUT && billing === "yearly" && (
                   <div className="text-xs" style={{ color: "var(--color-text-faint)" }}>$13.25/mo equivalent</div>
                 )}
               </div>
             </div>
-            {billing === "yearly" && (
+            {!IS_TEST_CHECKOUT && billing === "yearly" && (
               <div
                 className="inline-block mt-2 text-xs px-3 py-1 rounded-full font-medium"
                 style={{ background: "rgba(107,143,113,0.1)", color: "var(--color-accent)" }}
@@ -183,7 +188,7 @@ export default function PricingPage() {
                 300 credits included each year
               </div>
             )}
-            {billing === "monthly" && (
+            {(IS_TEST_CHECKOUT || billing === "monthly") && (
               <div className="mt-2 text-xs" style={{ color: "var(--color-text-faint)" }}>
                 30 credits included each month
               </div>
@@ -194,12 +199,12 @@ export default function PricingPage() {
           <div className="flex flex-col gap-3">
             <Button
               size="lg"
-              loading={loading === billing}
-              onClick={() => handleCheckout(billing)}
+              loading={loading === checkoutPlan}
+              onClick={() => handleCheckout(checkoutPlan)}
               className="w-full text-base"
             >
               {IS_TEST_CHECKOUT
-                ? "Test checkout — $1"
+                ? "Test checkout — $1/month"
                 : billing === "yearly"
                   ? "Start — 300 credits/year"
                   : "Start — 30 credits/month"}
@@ -242,7 +247,7 @@ export default function PricingPage() {
 
           {/* Features */}
           <ul className="grid grid-cols-1 gap-3">
-            {FEATURES.map((f) => (
+            {features.map((f) => (
               <li
                 key={f.label}
                 className="flex items-center gap-4 p-4 rounded-2xl"
@@ -327,9 +332,9 @@ export default function PricingPage() {
               Already have an account?{" "}
               <Link href="/login" className="nav-link" style={{ color: "var(--color-accent)" }}>Sign in →</Link>
             </p>
-            <Button size="lg" loading={loading === billing} onClick={() => handleCheckout(billing)}>
+            <Button size="lg" loading={loading === checkoutPlan} onClick={() => handleCheckout(checkoutPlan)}>
               {IS_TEST_CHECKOUT
-                ? "Test checkout — $1"
+                ? "Test checkout — $1/month"
                 : billing === "yearly"
                   ? "Start yearly — 300 credits"
                   : "Start monthly — 30 credits"}

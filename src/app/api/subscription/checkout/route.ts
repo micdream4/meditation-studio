@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import type { SubscriptionPlan } from "@/types/api";
 import { apiError, apiSuccess, isRecord, readJson } from "@/lib/api";
 import { ensureUserProfile, getRequestUser } from "@/lib/auth";
-import { createCreemCheckoutSession } from "@/lib/creem";
+import { createCreemCheckoutSession, getCreemMode } from "@/lib/creem";
 import { getSafeReturnUrl } from "@/lib/urls";
 
 export const runtime = "nodejs";
@@ -40,12 +40,14 @@ export async function POST(request: NextRequest) {
   const successUrl = new URL(safeReturnUrl);
   successUrl.searchParams.set("checkout", "success");
 
+  const plan = getCreemMode() === "test" ? "monthly" : body.plan;
+
   let checkoutUrl: string;
   try {
     checkoutUrl = await createCreemCheckoutSession({
       userId: user.id,
       email: user.email ?? null,
-      plan: body.plan,
+      plan,
       successUrl: successUrl.toString(),
     });
   } catch (error) {

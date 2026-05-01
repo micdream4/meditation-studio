@@ -47,7 +47,7 @@ type CreemPortalResponse = {
   customer_portal_link?: string;
 };
 
-function getCreemMode(): CreemMode {
+export function getCreemMode(): CreemMode {
   return getOptionalEnv("CREEM_MODE", "test") === "live" ? "live" : "test";
 }
 
@@ -117,8 +117,11 @@ export function getCreemProductId(plan: Exclude<SubscriptionPlan, null>) {
 }
 
 export function getPlanFromCreemProductId(productId: string | null | undefined): SubscriptionPlan {
-  const { monthlyProductId, yearlyProductId } = getCreemEnv();
+  const { testProductId, monthlyProductId, yearlyProductId } = getCreemEnv();
   if (!productId) return null;
+  if (getCreemMode() === "test" && testProductId && productId === testProductId) {
+    return "monthly";
+  }
   if (monthlyProductId && productId === monthlyProductId) return "monthly";
   if (yearlyProductId && productId === yearlyProductId) return "yearly";
   return null;
