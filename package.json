@@ -6,12 +6,22 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "node node_modules/eslint/bin/eslint.js .",
+    "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
+    "validate-env": "node --experimental-strip-types scripts/validate-env.ts",
+    "stripe:setup": "node --experimental-strip-types scripts/setup-stripe.ts",
+    "generate-previews": "bash scripts/generate-previews.sh",
+    "generate-music": "python3 scripts/generate_music.py"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.103.0",
+    "elevenlabs": "^1.59.0",
     "next": "16.2.3",
+    "openai": "^6.34.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "stripe": "^22.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
