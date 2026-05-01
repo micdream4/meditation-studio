@@ -285,15 +285,16 @@ export function splitTextIntoChunks(text: string, maxLength = 800) {
 function normalizePauseMarkers(text: string): string {
   // ElevenLabs does not use SSML here, so punctuation is the safest portable pause cue.
   return text
-    .replace(/\s*\[pause\]\s*/gi, " ... ... ")
+    .replace(/\s*\[pause\]\s*/gi, " ... ... ... ")
+    .replace(/([.!?])\s+(?=[A-Z])/g, "$1 ... ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function getMeditationSpeed(speechRate?: "slow" | "normal" | "fast") {
-  if (speechRate === "fast") return 0.96;
-  if (speechRate === "normal") return 0.86;
-  return 0.78;
+  if (speechRate === "fast") return 0.88;
+  if (speechRate === "normal") return 0.78;
+  return 0.7;
 }
 
 export async function synthesizeSpeechSegments(
@@ -312,8 +313,10 @@ export async function synthesizeSpeechSegments(
       previous_text: chunks[index - 1],
       next_text: chunks[index + 1],
       voice_settings: {
-        stability: 0.76,
-        similarity_boost: 0.8,
+        stability: 0.48,
+        similarity_boost: 0.72,
+        style: 0.28,
+        use_speaker_boost: true,
         speed: getMeditationSpeed(speechRate),
       },
     });
@@ -332,9 +335,11 @@ export async function synthesizeVoicePreview(voiceId: string) {
     model_id: getOptionalEnv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")!,
     output_format: "mp3_44100_128",
     voice_settings: {
-      stability: 0.78,
-      similarity_boost: 0.78,
-      speed: 0.82,
+      stability: 0.5,
+      similarity_boost: 0.72,
+      style: 0.25,
+      use_speaker_boost: true,
+      speed: 0.76,
     },
   });
 

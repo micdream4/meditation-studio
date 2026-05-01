@@ -109,6 +109,7 @@ export type SavedTrack = {
   title: string
   durationSeconds: number
   storageUrl: string
+  musicTrackId: string
   createdAt: string
 }
 

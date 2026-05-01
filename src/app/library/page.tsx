@@ -5,6 +5,8 @@ import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import AudioPlayer from "@/components/player/AudioPlayer";
 import Button from "@/components/ui/Button";
+import { downloadAudioFile } from "@/lib/download";
+import { getMusicTrack } from "@/lib/music";
 import type { SavedTrack } from "@/types/api";
 
 function formatDate(iso: string) {
@@ -47,6 +49,14 @@ export default function LibraryPage() {
     finally {
       setDeletingId(null);
       setConfirmDelete(null);
+    }
+  }
+
+  async function handleDownload(track: SavedTrack) {
+    try {
+      await downloadAudioFile(track.storageUrl, `${track.title}.mp3`);
+    } catch {
+      window.location.href = track.storageUrl;
     }
   }
 
@@ -115,9 +125,9 @@ export default function LibraryPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <a
-                          href={track.storageUrl}
-                          download
+                        <button
+                          type="button"
+                          onClick={() => handleDownload(track)}
                           className="w-8 h-8 rounded-full flex items-center justify-center"
                           style={{ background: "var(--color-surface-raised)", border: "1px solid var(--color-border)" }}
                           title="Download"
@@ -126,7 +136,7 @@ export default function LibraryPage() {
                             <path d="M6 1v8M3 6l3 3 3-3" stroke="var(--color-text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                             <path d="M1 11h10" stroke="var(--color-text-muted)" strokeWidth="1.5" strokeLinecap="round" />
                           </svg>
-                        </a>
+                        </button>
                         {confirmDelete === track.id ? (
                           <div className="flex items-center gap-1">
                             <button onClick={() => handleDelete(track.id)} disabled={deletingId === track.id} className="px-2.5 py-1 rounded-lg text-xs font-medium" style={{ background: "rgba(192,84,74,0.15)", color: "var(--color-error)" }}>
@@ -144,7 +154,11 @@ export default function LibraryPage() {
                       </div>
                     </div>
 
-                    <AudioPlayer ttsUrl={track.storageUrl} compact />
+                    <AudioPlayer
+                      ttsUrl={track.storageUrl}
+                      musicUrl={getMusicTrack(track.musicTrackId).url}
+                      compact
+                    />
                   </div>
                 </div>
               ))}

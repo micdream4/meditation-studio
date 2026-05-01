@@ -27,6 +27,26 @@ export async function GET(request: NextRequest) {
     throw error;
   }
 
+  const generationIds = data.map((track) => track.generation_id);
+  const { data: generations, error: generationsError } = generationIds.length > 0
+    ? await admin
+      .from("generations")
+      .select("id,music_track_id")
+      .eq("user_id", user.id)
+      .in("id", generationIds)
+    : { data: [], error: null };
+
+  if (generationsError) {
+    throw generationsError;
+  }
+
+  const musicTrackByGenerationId = new Map(
+    (generations ?? []).map((generation) => [
+      generation.id,
+      generation.music_track_id,
+    ]),
+  );
+
   return apiSuccess(
     {
       tracks: data.map((track) => ({
@@ -35,6 +55,7 @@ export async function GET(request: NextRequest) {
         title: track.title,
         durationSeconds: track.duration_seconds,
         storageUrl: getStorageUrl(track.storage_path),
+        musicTrackId: musicTrackByGenerationId.get(track.generation_id) ?? "none",
         createdAt: track.created_at,
       })),
       total: data.length,

@@ -22,7 +22,7 @@ function formatTime(seconds: number) {
 }
 
 const WAVEFORM_HEIGHTS = [10, 18, 28, 14, 32, 20, 12, 26, 16, 30, 22, 10, 24, 18, 28, 14, 32, 20, 12, 26, 16, 8, 22, 30, 14];
-const PLAYBACK_RATES = [0.9, 1, 1.1] as const;
+const PLAYBACK_RATES = [0.75, 0.85, 1] as const;
 const COMPACT_PLAY_EVENT = "meditation-audio-play";
 
 type PitchPreservingAudio = HTMLAudioElement & {
@@ -51,18 +51,21 @@ export default function AudioPlayer({ ttsUrl, musicUrl, title, onSave, onDownloa
   const startTimeRef  = useRef<number>(0);
   const offsetRef     = useRef<number>(0);
   const animFrameRef  = useRef<number>(0);
+  const playingRef    = useRef(false);
+  const currentTimeRef = useRef(0);
 
   const [playing,     setPlaying]     = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration,    setDuration]    = useState(0);
   const [ttsVol,      setTtsVol]      = useState(1);
   const [musicVol,    setMusicVol]    = useState(DEFAULT_MUSIC_VOLUME);
-  const [playbackRate, setPlaybackRate] = useState<(typeof PLAYBACK_RATES)[number]>(1);
+  const [playbackRate, setPlaybackRate] = useState<(typeof PLAYBACK_RATES)[number]>(0.85);
   const [loaded,      setLoaded]      = useState(false);
   const [error,       setError]       = useState<string | null>(null);
+  const useMixedPlayback = !compact || Boolean(musicUrl);
 
   useEffect(() => {
-    if (compact) {
+    if (!useMixedPlayback) {
       return;
     }
 
@@ -113,10 +116,10 @@ export default function AudioPlayer({ ttsUrl, musicUrl, title, onSave, onDownloa
       audioCtxRef.current?.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compact, ttsUrl, musicUrl]);
+  }, [useMixedPlayback, ttsUrl, musicUrl]);
 
   useEffect(() => {
-    if (!compact) {
+    if (useMixedPlayback) {
       return;
     }
 
@@ -174,7 +177,7 @@ export default function AudioPlayer({ ttsUrl, musicUrl, title, onSave, onDownloa
     };
   // The active audio element should only be recreated when the source changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compact, ttsUrl]);
+  }, [useMixedPlayback, ttsUrl]);
 
   function stopSources() {
     try { ttsSourceRef.current?.stop(); } catch { }
@@ -234,6 +237,9 @@ export default function AudioPlayer({ ttsUrl, musicUrl, title, onSave, onDownloa
       offsetRef.current = (audioCtxRef.current!.currentTime - startTimeRef.current) * playbackRate;
       setPlaying(false);
     } else {
+      if (compact) {
+        window.dispatchEvent(new CustomEvent(COMPACT_PLAY_EVENT, { detail: playerIdRef.current }));
+      }
       startPlayback(offsetRef.current);
       setPlaying(true);
     }
@@ -247,6 +253,11 @@ export default function AudioPlayer({ ttsUrl, musicUrl, title, onSave, onDownloa
   }
 
   function toggleCompactPlay() {
+    if (useMixedPlayback) {
+      togglePlay();
+      return;
+    }
+
     const audio = compactAudioRef.current;
     if (!audio || !loaded) return;
 
@@ -268,6 +279,11 @@ export default function AudioPlayer({ ttsUrl, musicUrl, title, onSave, onDownloa
   }
 
   function seekCompact(pct: number) {
+    if (useMixedPlayback) {
+      seek(pct);
+      return;
+    }
+
     const audio = compactAudioRef.current;
     if (!audio || !duration) return;
 
@@ -284,7 +300,7 @@ export default function AudioPlayer({ ttsUrl, musicUrl, title, onSave, onDownloa
   }, [ttsVol]);
   useEffect(() => { if (musicGainRef.current) musicGainRef.current.gain.value = musicVol; }, [musicVol]);
   useEffect(() => {
-    if (compact) {
+    if (compact && !useMixedPlayback) {
       if (compactAudioRef.current) {
         compactAudioRef.current.playbackRate = playbackRate;
         preservePitch(compactAudioRef.current);
@@ -297,7 +313,34 @@ export default function AudioPlayer({ ttsUrl, musicUrl, title, onSave, onDownloa
     startPlayback(offsetRef.current);
   // Restart only when the user changes speed while audio is playing.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compact, playbackRate]);
+  }, [compact, useMixedPlayback, playbackRate]);
+
+  useEffect(() => {
+    playingRef.current = playing;
+  }, [playing]);
+
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+
+  useEffect(() => {
+    if (!compact || !useMixedPlayback) {
+      return;
+    }
+
+    const handleGlobalPlay = (event: Event) => {
+      const activeId = (event as CustomEvent<string>).detail;
+      if (activeId !== playerIdRef.current && playingRef.current) {
+        stopSources();
+        cancelAnimationFrame(animFrameRef.current);
+        offsetRef.current = currentTimeRef.current;
+        setPlaying(false);
+      }
+    };
+
+    window.addEventListener(COMPACT_PLAY_EVENT, handleGlobalPlay);
+    return () => window.removeEventListener(COMPACT_PLAY_EVENT, handleGlobalPlay);
+  }, [compact, useMixedPlayback]);
 
   const progress = duration > 0 ? currentTime / duration : 0;
 

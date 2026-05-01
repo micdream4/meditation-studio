@@ -12,6 +12,7 @@ import {
   getInitialMusicTrackId,
   getMusicTrack,
 } from "@/lib/music";
+import { downloadAudioFile } from "@/lib/download";
 import type { GenerationDurationMinutes, GenerateRequest, GenerateResponse, Voice } from "@/types/api";
 
 type Mode = "mood" | "template" | "custom";
@@ -461,12 +462,13 @@ function CreatePageInner() {
     }
   }
 
-  function handleDownload() {
+  async function handleDownload() {
     if (!audioUrl) return;
-    const a = document.createElement("a");
-    a.href = audioUrl;
-    a.download = `meditation-${duration}min.mp3`;
-    a.click();
+    try {
+      await downloadAudioFile(audioUrl, `meditation-${duration}min.mp3`);
+    } catch {
+      window.location.href = audioUrl;
+    }
   }
 
   const canGenerate =
