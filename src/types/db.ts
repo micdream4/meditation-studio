@@ -12,7 +12,9 @@ export type DbUser = {
   subscription_end: string | null
   generation_credits_used: number
   voice_clone_credits_used: number
-  stripe_customer_id: string | null
+  stripe_customer_id: string | null // legacy Stripe field; retained for existing databases
+  creem_customer_id: string | null
+  creem_subscription_id: string | null
   created_at: string
 }
 

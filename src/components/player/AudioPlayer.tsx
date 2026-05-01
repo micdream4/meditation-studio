@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 
+import { DEFAULT_MUSIC_VOLUME } from "@/lib/music";
+
 interface AudioPlayerProps {
   ttsUrl: string;
   musicUrl?: string;
@@ -54,7 +56,7 @@ export default function AudioPlayer({ ttsUrl, musicUrl, title, onSave, onDownloa
   const [currentTime, setCurrentTime] = useState(0);
   const [duration,    setDuration]    = useState(0);
   const [ttsVol,      setTtsVol]      = useState(1);
-  const [musicVol,    setMusicVol]    = useState(0.06);
+  const [musicVol,    setMusicVol]    = useState(DEFAULT_MUSIC_VOLUME);
   const [playbackRate, setPlaybackRate] = useState<(typeof PLAYBACK_RATES)[number]>(1);
   const [loaded,      setLoaded]      = useState(false);
   const [error,       setError]       = useState<string | null>(null);
@@ -67,6 +69,10 @@ export default function AudioPlayer({ ttsUrl, musicUrl, title, onSave, onDownloa
     let cancelled = false;
     setLoaded(false);
     setError(null);
+    setPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    offsetRef.current = 0;
 
     async function load() {
       try {

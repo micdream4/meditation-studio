@@ -1,43 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { getMissingEnv, loadLocalEnv } from "./env-utils.ts";
 
-function loadEnvFile(filename: string) {
-  const filePath = resolve(process.cwd(), filename);
-  if (!existsSync(filePath)) {
-    return;
-  }
-
-  const content = readFileSync(filePath, "utf8");
-  for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) {
-      continue;
-    }
-
-    const separatorIndex = line.indexOf("=");
-    if (separatorIndex <= 0) {
-      continue;
-    }
-
-    const key = line.slice(0, separatorIndex).trim();
-    if (!key || process.env[key]) {
-      continue;
-    }
-
-    let value = line.slice(separatorIndex + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    process.env[key] = value;
-  }
-}
-
-loadEnvFile(".env.local");
-loadEnvFile(".env");
+loadLocalEnv();
 
 const requiredEnv = [
   "NEXT_PUBLIC_APP_URL",
@@ -48,10 +11,18 @@ const requiredEnv = [
   "OPENROUTER_MODEL",
   "ELEVENLABS_API_KEY",
   "ELEVENLABS_MODEL_ID",
-  "STRIPE_SECRET_KEY",
-  "STRIPE_WEBHOOK_SECRET",
-  "STRIPE_MONTHLY_PRICE_ID",
-  "STRIPE_YEARLY_PRICE_ID",
+  "CREEM_API_KEY",
+  "CREEM_WEBHOOK_SECRET",
+] as const;
+
+const requiredCreemProductEnv =
+  process.env.CREEM_MODE === "live"
+    ? (["CREEM_MONTHLY_PRODUCT_ID", "CREEM_YEARLY_PRODUCT_ID"] as const)
+    : (["CREEM_TEST_PRODUCT_ID"] as const);
+
+const requiredBillingEnv = [
+  ...requiredEnv,
+  ...requiredCreemProductEnv,
 ] as const;
 
 const optionalVoiceEnv = [
@@ -61,10 +32,7 @@ const optionalVoiceEnv = [
   "NEXT_PUBLIC_VOICE_ZH_2_ID",
 ] as const;
 
-const missing = requiredEnv.filter((key) => {
-  const value = process.env[key];
-  return !value || value.trim().length === 0;
-});
+const missing = getMissingEnv(requiredBillingEnv);
 
 if (missing.length > 0) {
   console.error("Missing required environment variables:");

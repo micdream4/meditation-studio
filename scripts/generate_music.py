@@ -1,90 +1,113 @@
 from __future__ import annotations
 
 import math
+import random
+import shutil
+import subprocess
+import wave
 from array import array
 from pathlib import Path
 
-import lameenc
-
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / "public" / "music" / "piano-light-1.mp3"
-SAMPLE_RATE = 44100
-CHANNELS = 2
-DURATION_SECONDS = 96
+MUSIC_DIR = ROOT / "public" / "music"
+WAV_OUTPUT = MUSIC_DIR / "meditation-pad.wav"
+M4A_OUTPUT = MUSIC_DIR / "meditation-pad.m4a"
+
+SAMPLE_RATE = 24000
+DURATION_SECONDS = 180
+RANDOM_SEED = 250501
 
 
-def adsr(position: float, duration: float) -> float:
-    attack = min(0.04, duration * 0.08)
-    decay = min(0.25, duration * 0.15)
-    release = min(0.4, duration * 0.2)
-    sustain = max(0.0, duration - attack - decay - release)
-
-    if position < attack:
-        return position / attack
-    if position < attack + decay:
-        decay_progress = (position - attack) / decay
-        return 1.0 - decay_progress * 0.3
-    if position < attack + decay + sustain:
-        return 0.7
-    release_progress = (position - attack - decay - sustain) / release
-    return max(0.0, 0.7 * (1.0 - release_progress))
+def clamp(value: float) -> float:
+    return max(-1.0, min(1.0, value))
 
 
-def note_wave(frequency: float, time_value: float) -> float:
-    return (
-        math.sin(2 * math.pi * frequency * time_value) * 0.72
-        + math.sin(2 * math.pi * frequency * 2 * time_value) * 0.18
-        + math.sin(2 * math.pi * frequency * 3 * time_value) * 0.10
-    )
+def fade_envelope(position: float, duration: float) -> float:
+    fade_seconds = 8.0
+    fade_in = min(1.0, position / fade_seconds)
+    fade_out = min(1.0, (duration - position) / fade_seconds)
+    return max(0.0, min(fade_in, fade_out))
 
 
-def build_score():
-    return [
-        ([261.63, 329.63, 392.00], 3.0),
-        ([293.66, 369.99, 440.00], 3.0),
-        ([220.00, 293.66, 349.23], 3.0),
-        ([246.94, 311.13, 392.00], 3.0),
-    ]
+def smooth_noise(previous: float, target: float, amount: float) -> float:
+    return previous + (target - previous) * amount
 
 
-def main() -> None:
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-
-    score = build_score()
+def render_pad() -> array:
+    rng = random.Random(RANDOM_SEED)
     total_frames = SAMPLE_RATE * DURATION_SECONDS
     samples = array("h")
 
+    chord = [110.0, 146.83, 196.0, 220.0, 293.66]
+    phases = [rng.random() * math.tau for _ in chord]
+    detune = [rng.uniform(-0.08, 0.08) for _ in chord]
+    noise_value = 0.0
+    noise_target = 0.0
+
     for frame in range(total_frames):
-        current_time = frame / SAMPLE_RATE
-        block_index = int(current_time // 3.0) % len(score)
-        chord, chord_duration = score[block_index]
-        block_start = int(current_time // 3.0) * 3.0
-        local_time = current_time - block_start
+        t = frame / SAMPLE_RATE
+        if frame % 900 == 0:
+            noise_target = rng.uniform(-1.0, 1.0)
+        noise_value = smooth_noise(noise_value, noise_target, 0.0008)
 
-        signal = 0.0
-        for note_index, frequency in enumerate(chord):
-            onset = note_index * 0.24
-            note_duration = max(0.9, chord_duration - onset + 0.25)
-            note_time = local_time - onset
-            if 0 <= note_time <= note_duration:
-                signal += note_wave(frequency, note_time) * adsr(note_time, note_duration)
+        pad = 0.0
+        for index, frequency in enumerate(chord):
+            slow_lfo = 1.0 + 0.0015 * math.sin(math.tau * t / (23.0 + index * 3.0))
+            phase = phases[index] + math.tau * (frequency + detune[index]) * slow_lfo * t
+            overtone = math.sin(phase * 2.0) * 0.08
+            pad += (math.sin(phase) + overtone) * (0.18 / (index + 1) ** 0.4)
 
-        signal *= 0.12
-        drift = 0.97 + 0.03 * math.sin(2 * math.pi * current_time / 12.0)
-        left = max(-1.0, min(1.0, signal * drift))
-        right = max(-1.0, min(1.0, signal * (2.0 - drift)))
-        samples.append(int(left * 32767))
-        samples.append(int(right * 32767))
+        breath = 0.72 + 0.28 * math.sin(math.tau * t / 9.5) ** 2
+        shimmer = math.sin(math.tau * 528.0 * t + math.sin(math.tau * t / 17.0)) * 0.015
+        low_air = noise_value * 0.035
+        signal = (pad * breath + shimmer + low_air) * fade_envelope(t, DURATION_SECONDS)
 
-    encoder = lameenc.Encoder()
-    encoder.set_bit_rate(128)
-    encoder.set_in_sample_rate(SAMPLE_RATE)
-    encoder.set_channels(CHANNELS)
-    encoder.set_quality(2)
+        samples.append(int(clamp(signal * 0.34) * 32767))
 
-    encoded = encoder.encode(samples.tobytes()) + encoder.flush()
-    OUTPUT.write_bytes(encoded)
-    print(f"generated music: {OUTPUT.relative_to(ROOT)}")
+    return samples
+
+
+def write_wav(samples: array) -> None:
+    with wave.open(str(WAV_OUTPUT), "wb") as wav:
+      wav.setnchannels(1)
+      wav.setsampwidth(2)
+      wav.setframerate(SAMPLE_RATE)
+      wav.writeframes(samples.tobytes())
+
+
+def convert_to_m4a() -> bool:
+    if not shutil.which("afconvert"):
+        return False
+
+    try:
+        subprocess.run(
+            [
+                "afconvert",
+                "-f",
+                "m4af",
+                "-d",
+                "aac",
+                str(WAV_OUTPUT),
+                str(M4A_OUTPUT),
+            ],
+            check=True,
+        )
+        return True
+    except subprocess.CalledProcessError:
+        M4A_OUTPUT.unlink(missing_ok=True)
+        return False
+
+
+def main() -> None:
+    MUSIC_DIR.mkdir(parents=True, exist_ok=True)
+    samples = render_pad()
+    write_wav(samples)
+
+    if convert_to_m4a():
+        WAV_OUTPUT.unlink(missing_ok=True)
+        print(f"generated music: {M4A_OUTPUT.relative_to(ROOT)}")
+    else:
+        print(f"generated music: {WAV_OUTPUT.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

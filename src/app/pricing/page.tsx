@@ -29,7 +29,7 @@ const FAQ = [
   },
   {
     q: "What payment methods do you accept?",
-    a: "All major credit and debit cards via Stripe. Secure, encrypted checkout.",
+    a: "Payments are processed securely through Creem. We never see or store your card details.",
   },
   {
     q: "Is there a free trial?",
@@ -41,13 +41,17 @@ const FAQ = [
   },
 ];
 
+const IS_TEST_CHECKOUT = process.env.NEXT_PUBLIC_CREEM_MODE !== "live";
+
 export default function PricingPage() {
   const [billing, setBilling] = useState<"monthly" | "yearly">("yearly");
   const [loading, setLoading] = useState<"monthly" | "yearly" | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   async function handleCheckout(plan: "monthly" | "yearly") {
     setLoading(plan);
+    setCheckoutError(null);
     try {
       const res = await fetch("/api/subscription/checkout", {
         method: "POST",
@@ -57,11 +61,13 @@ export default function PricingPage() {
       const json = await res.json();
       if (json.success) {
         window.location.href = json.data.checkoutUrl;
-      } else {
+      } else if (json.error?.code === "unauthorized") {
         window.location.href = `/signup?plan=${plan}`;
+      } else {
+        setCheckoutError(json.error?.message ?? "Checkout is unavailable right now.");
       }
     } catch {
-      window.location.href = `/signup?plan=${plan}`;
+      setCheckoutError("Checkout is unavailable right now. Please try again later.");
     } finally {
       setLoading(null);
     }
@@ -145,18 +151,26 @@ export default function PricingPage() {
 
           {/* Price display */}
           <div className="text-center mb-10">
+            {IS_TEST_CHECKOUT && (
+              <div
+                className="inline-block mb-3 text-xs px-3 py-1 rounded-full font-medium"
+                style={{ background: "rgba(192,122,90,0.1)", color: "var(--color-accent-warm)" }}
+              >
+                Test checkout · $1
+              </div>
+            )}
             <div className="flex items-end justify-center gap-2">
               <span
                 className="text-[76px] leading-none font-bold tracking-tight transition-all duration-300"
                 style={{ fontFamily: "var(--font-display)", color: "var(--color-text)" }}
               >
-                {billing === "monthly" ? "$19" : "$159"}
+                {IS_TEST_CHECKOUT ? "$1" : billing === "monthly" ? "$19" : "$159"}
               </span>
               <div className="pb-3 text-left">
                 <div className="text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
-                  {billing === "monthly" ? "/month" : "/year"}
+                  {IS_TEST_CHECKOUT ? "test" : billing === "monthly" ? "/month" : "/year"}
                 </div>
-                {billing === "yearly" && (
+                {!IS_TEST_CHECKOUT && billing === "yearly" && (
                   <div className="text-xs" style={{ color: "var(--color-text-faint)" }}>$13.25/mo equivalent</div>
                 )}
               </div>
@@ -184,8 +198,17 @@ export default function PricingPage() {
               onClick={() => handleCheckout(billing)}
               className="w-full text-base"
             >
-              {billing === "yearly" ? "Start — 300 credits/year" : "Start — 30 credits/month"}
+              {IS_TEST_CHECKOUT
+                ? "Test checkout — $1"
+                : billing === "yearly"
+                  ? "Start — 300 credits/year"
+                  : "Start — 30 credits/month"}
             </Button>
+            {checkoutError && (
+              <p className="text-xs text-center px-3 py-2 rounded-xl" style={{ background: "rgba(192,84,74,0.08)", color: "var(--color-error)", border: "1px solid rgba(192,84,74,0.18)" }}>
+                {checkoutError}
+              </p>
+            )}
             <div className="flex items-center justify-center gap-5 text-xs" style={{ color: "var(--color-text-faint)" }}>
               <span className="flex items-center gap-1.5">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -198,7 +221,7 @@ export default function PricingPage() {
                   <rect x="1.5" y="4" width="9" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
                   <path d="M4 4V3a2 2 0 114 0v1" stroke="currentColor" strokeWidth="1.2"/>
                 </svg>
-                Secure via Stripe
+                Secure via Creem
               </span>
               <span className="flex items-center gap-1.5">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -305,8 +328,17 @@ export default function PricingPage() {
               <Link href="/login" className="nav-link" style={{ color: "var(--color-accent)" }}>Sign in →</Link>
             </p>
             <Button size="lg" loading={loading === billing} onClick={() => handleCheckout(billing)}>
-              {billing === "yearly" ? "Start yearly — 300 credits" : "Start monthly — 30 credits"}
+              {IS_TEST_CHECKOUT
+                ? "Test checkout — $1"
+                : billing === "yearly"
+                  ? "Start yearly — 300 credits"
+                  : "Start monthly — 30 credits"}
             </Button>
+            {checkoutError && (
+              <p className="text-xs text-center mt-3 px-3 py-2 rounded-xl" style={{ background: "rgba(192,84,74,0.08)", color: "var(--color-error)", border: "1px solid rgba(192,84,74,0.18)" }}>
+                {checkoutError}
+              </p>
+            )}
           </div>
         </section>
 

@@ -26,6 +26,8 @@ export type Database = {
           generation_credits_used?: number;
           voice_clone_credits_used?: number;
           stripe_customer_id?: string | null;
+          creem_customer_id?: string | null;
+          creem_subscription_id?: string | null;
           created_at?: string;
         };
         Update: Partial<DbUser>;

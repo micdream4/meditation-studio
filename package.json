@@ -9,8 +9,11 @@
     "lint": "node node_modules/eslint/bin/eslint.js .",
     "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
     "validate-env": "node --experimental-strip-types scripts/validate-env.ts",
-    "stripe:setup": "node --experimental-strip-types scripts/setup-stripe.ts",
+    "validate:supabase": "node --experimental-strip-types scripts/validate-supabase-schema.ts",
+    "validate:creem": "node --experimental-strip-types scripts/validate-creem.ts",
+    "creem:doctor": "node --experimental-strip-types scripts/creem-doctor.ts",
     "generate-previews": "bash scripts/generate-previews.sh",
+    "generate-voice-previews": "node --experimental-strip-types scripts/generate-voice-previews.ts",
     "generate-music": "python3 scripts/generate_music.py"
   },
   "dependencies": {
@@ -20,8 +23,7 @@
     "next": "16.2.3",
     "openai": "^6.34.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "stripe": "^22.0.1"
+    "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

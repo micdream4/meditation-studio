@@ -3,11 +3,7 @@ import { NextRequest } from "next/server";
 import type { SubscriptionPlan } from "@/types/api";
 import { apiError, apiSuccess, isRecord, readJson } from "@/lib/api";
 import { ensureUserProfile, getRequestUser } from "@/lib/auth";
-import {
-  getOrCreateStripeCustomer,
-  getStripeClient,
-  getStripePriceId,
-} from "@/lib/stripe";
+import { createCreemCheckoutSession } from "@/lib/creem";
 import { getSafeReturnUrl } from "@/lib/urls";
 
 export const runtime = "nodejs";
@@ -29,10 +25,12 @@ export async function POST(request: NextRequest) {
     return apiError("invalid_request", "Invalid checkout payload.", 400, response);
   }
 
-  await ensureUserProfile(user.id, user.email ?? null);
+  try {
+    await ensureUserProfile(user.id, user.email ?? null);
+  } catch (error) {
+    throw error;
+  }
 
-  const customerId = await getOrCreateStripeCustomer(user.id, user.email ?? null);
-  const stripe = getStripeClient();
   const safeReturnUrl = getSafeReturnUrl(body.returnUrl, request.nextUrl.origin);
 
   if (!safeReturnUrl) {
@@ -41,28 +39,30 @@ export async function POST(request: NextRequest) {
 
   const successUrl = new URL(safeReturnUrl);
   successUrl.searchParams.set("checkout", "success");
-  const cancelUrl = new URL(safeReturnUrl);
-  cancelUrl.searchParams.set("checkout", "canceled");
 
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    customer: customerId,
-    line_items: [{ price: getStripePriceId(body.plan), quantity: 1 }],
-    success_url: successUrl.toString(),
-    cancel_url: cancelUrl.toString(),
-    metadata: { userId: user.id, plan: body.plan },
-    subscription_data: {
-      metadata: {
-        userId: user.id,
-        plan: body.plan,
-      },
-    },
-    allow_promotion_codes: true,
-  });
+  let checkoutUrl: string;
+  try {
+    checkoutUrl = await createCreemCheckoutSession({
+      userId: user.id,
+      email: user.email ?? null,
+      plan: body.plan,
+      successUrl: successUrl.toString(),
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.startsWith("Missing required environment variable:")
+    ) {
+      return apiError(
+        "creem_not_configured",
+        "Creem is not configured yet. Add Creem API key and Product IDs before testing checkout.",
+        503,
+        response,
+      );
+    }
 
-  if (!session.url) {
-    return apiError("stripe_checkout_failed", "Stripe did not return a checkout URL.", 500, response);
+    throw error;
   }
 
-  return apiSuccess({ checkoutUrl: session.url }, response);
+  return apiSuccess({ checkoutUrl }, response);
 }

@@ -26,7 +26,7 @@ export default function PrivacyPage() {
                 <li><strong style={{ color: "var(--color-text)" }}>Account data</strong> — email address and encrypted password (or OAuth identity if you sign in with Google).</li>
                 <li><strong style={{ color: "var(--color-text)" }}>Generation inputs</strong> — the mood, theme, or custom text you provide to generate a session. These are used solely to produce your meditation.</li>
                 <li><strong style={{ color: "var(--color-text)" }}>Usage data</strong> — basic session logs (timestamps, generation counts) for rate-limiting and abuse prevention.</li>
-                <li><strong style={{ color: "var(--color-text)" }}>Payment data</strong> — handled entirely by Stripe. We never see or store your card details.</li>
+                <li><strong style={{ color: "var(--color-text)" }}>Payment data</strong> — handled entirely by Creem. We never see or store your card details.</li>
               </ul>
             </section>
 
@@ -46,7 +46,7 @@ export default function PrivacyPage() {
               <p className="mb-3">We use a small number of trusted third-party services to operate:</p>
               <ul className="flex flex-col gap-2 pl-4" style={{ listStyleType: "disc" }}>
                 <li><strong style={{ color: "var(--color-text)" }}>Supabase</strong> — database and authentication.</li>
-                <li><strong style={{ color: "var(--color-text)" }}>Stripe</strong> — payment processing.</li>
+                <li><strong style={{ color: "var(--color-text)" }}>Creem</strong> — payment processing.</li>
                 <li><strong style={{ color: "var(--color-text)" }}>ElevenLabs</strong> — text-to-speech voice synthesis. Your script text is sent to ElevenLabs to generate audio.</li>
                 <li><strong style={{ color: "var(--color-text)" }}>OpenRouter</strong> — AI script generation. Your mood/theme input is sent to generate your meditation script.</li>
               </ul>
@@ -60,7 +60,7 @@ export default function PrivacyPage() {
 
             <section>
               <h2 className="text-base font-medium mb-3" style={{ color: "var(--color-text)" }}>5. Your rights</h2>
-              <p>You may request deletion of your account and associated data at any time by contacting us. Stripe payment records are subject to legal retention requirements and are managed by Stripe directly.</p>
+              <p>You may request deletion of your account and associated data at any time by contacting us. Creem payment records are subject to legal retention requirements and are managed by Creem directly.</p>
             </section>
 
             <section>

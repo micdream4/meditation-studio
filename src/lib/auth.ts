@@ -70,6 +70,8 @@ export async function ensureUserProfile(userId: string, email: string | null) {
       generation_credits_used: 0,
       voice_clone_credits_used: 0,
       stripe_customer_id: null,
+      creem_customer_id: null,
+      creem_subscription_id: null,
     })
     .select("*")
     .single();

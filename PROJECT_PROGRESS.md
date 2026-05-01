@@ -46,7 +46,7 @@
 
 | PRD 章节 | 关键要求 | 对应任务 | 当前状态 | 说明 |
 |----------|----------|----------|----------|------|
-| 第五章 商业模式与用户权益 | 月付 / 年付订阅 + 生成积分、游客与订阅用户分层 | `BILL-01` `BILL-02` `BILL-03` `BILL-04` | `部分完成` | 订阅链路已实现；已改为积分制；真实 Stripe Product/Price 和 Portal 仍需后台配置 |
+| 第五章 商业模式与用户权益 | 月付 / 年付订阅 + 生成积分、游客与订阅用户分层 | `BILL-01` `BILL-02` `BILL-03` `BILL-04` | `部分完成` | 订阅链路已切换到 Creem；真实 Creem Product 和 webhook secret 仍需后台配置 |
 | 第五章 公平使用与成本控制 | 并发、分钟级、日级限制 | `SAFE-02` `GEN-05` | `已完成（基础版）` | 已做并发 1、1 分钟 2 次、1 日 20 次；月度 60 次人工审查未落地 |
 | 第五章 声音克隆规则 | 声音克隆 | `SAFE-05` | `按 PRD 延后` | `voice_profiles` 表已建，但功能未开放，符合 `v1.1` 延期决定 |
 | 第六章 6.2 三种生成模式 | Mood / Template / Custom | `GEN-01` `CREATE-02` `CREATE-03` `CREATE-04` | `已完成` | 三种模式前后端已接通 |
@@ -58,7 +58,7 @@
 | 第六章 6.8 精选内容 | 8 首精选完整播放 | `CUR-01` `CUR-02` `CUR-03` `CUR-04` | `已完成（基础版）` | 首页已开放完整播放；版权归档与封面未完成 |
 | 第七章 页面需求 | `/` `/pricing` `/login` `/signup` `/create` `/library` `/account` | `WEB-*` `AUTH-*` `CREATE-*` `LIB-*` | `大部分完成` | 页面已齐；个别验收项如 SEO、完整 paywall 细化、账户页声音入口仍未完成 |
 | 第八章 数据模型 | `users` `generations` `saved_tracks` `voice_profiles` `curated_tracks` | `DATA-01` `DATA-02` `DATA-03` `DATA-04` `DATA-05` | `已完成` | migration 已执行到远端 Supabase，`curated_tracks` seed 为 8 条，`audio-assets` bucket 已创建 |
-| 第九章 技术方案 | Supabase / Stripe / OpenRouter / ElevenLabs / IndexedDB / ffmpeg / Vercel | `INF-*` `GEN-*` `SAVE-*` | `部分完成` | 主技术栈已接入；IndexedDB 未做；ffmpeg 混音按 PRD 已延期到 `v1.1` |
+| 第九章 技术方案 | Supabase / Creem / OpenRouter / ElevenLabs / IndexedDB / ffmpeg / Vercel | `INF-*` `GEN-*` `SAVE-*` | `部分完成` | 主技术栈已接入；IndexedDB 未做；ffmpeg 混音按 PRD 已延期到 `v1.1` |
 | 第十章 安全合规 | 非医疗边界、危机输入、版权可追溯 | `SAFE-01` `SAFE-03` `SAFE-04` | `部分完成` | 非医疗边界和危机输入已有基础实现；版权清单与正式音乐授权文件未归档 |
 | 第十一章 MVP 必做 | 首页、支付、生成、播放、保存、精选、账户 | `INF/BILL/GEN/CREATE/LIB/CUR` | `大部分完成` | 当前最明显未完成项是本地缓存 |
 | 第十一章 MVP 不做 | 声音克隆、中文预设声音、服务端下载混音 | — | `已对齐` | 当前实现没有越界，符合 PRD |
@@ -75,7 +75,7 @@
 
 - `INF-01` 初始化项目骨架
 - `INF-02` 环境变量模板与校验脚本
-- `INF-03` 第三方服务封装：Supabase / Stripe / OpenRouter / ElevenLabs
+- `INF-03` 第三方服务封装：Supabase / Creem / OpenRouter / ElevenLabs
 - `INF-05` 路由守卫与受保护路由
 - `DATA-01` `DATA-02` `DATA-03` `DATA-04` `DATA-05` migration 与 bucket 方案
 - `AUTH-01` Supabase Auth 接入
@@ -84,7 +84,7 @@
 - `AUTH-04` 忘记密码与重置密码页面
 - `AUTH-05` `/account` 基础订阅信息区
 - `BILL-02` Checkout 接口
-- `BILL-03` Stripe Webhook 同步订阅状态
+- `BILL-03` Creem Webhook 同步订阅状态
 - `BILL-04` Customer Portal 接口
 - `BILL-05` 订阅态接口与生成接口订阅校验
 - `WEB-01` 首页
@@ -108,12 +108,12 @@
 
 ### 4.2 已完成但仍需外部执行
 
-- `BILL-01` Stripe 产品和 Price 的“代码侧支持”已完成，但后台对象未创建
+- `BILL-01` Creem checkout / webhook 的“代码侧支持”已完成，但后台 Product 和 webhook secret 未创建
 - `AUTH-01` Email / Google OAuth 代码已接好，但 Supabase Dashboard 仍需开启 provider
 
 ### 4.3 已完成的接管修复
 
-- 修复 Stripe `returnUrl` 站外跳转风险
+- 修复支付 `returnUrl` 站外跳转风险
 - 修复 OAuth callback 失败后仍假装登录成功的问题
 - 修复 `/api/generate` 契约校验过弱的问题
 - 修复 curated 静态资源依赖 `NEXT_PUBLIC_APP_URL` 的问题
@@ -128,7 +128,7 @@
 
 ### 5.1 P0：上线阻塞
 
-- `BILL-01` 在 Stripe 后台创建 Product、Monthly Price、Yearly Price
+- `BILL-01` 在 Creem 后台创建 Monthly Product、Yearly Product
   - Monthly Price: `$19/month`, includes 30 generation credits
   - Yearly Price: `$159/year`, includes 300 generation credits
 - 配置线上环境变量
@@ -190,7 +190,7 @@
 
 建议按这个顺序推进：
 
-1. 补齐外部配置：Stripe / ElevenLabs / Google OAuth / 线上 Env
+1. 补齐外部配置：Creem / ElevenLabs / Google OAuth / 线上 Env
 2. 跑完整链路联调
 3. 接入 prompt pack 和 voice settings
 4. 做本地缓存与埋点
@@ -208,7 +208,7 @@
 - 生成核心：[src/lib/generation.ts](/Users/huanglu/Documents/Code/25-meditation-studio/src/lib/generation.ts)
 - 文案生成：[src/lib/openrouter.ts](/Users/huanglu/Documents/Code/25-meditation-studio/src/lib/openrouter.ts)
 - TTS：[src/lib/elevenlabs.ts](/Users/huanglu/Documents/Code/25-meditation-studio/src/lib/elevenlabs.ts)
-- 支付：[src/lib/stripe.ts](/Users/huanglu/Documents/Code/25-meditation-studio/src/lib/stripe.ts)
+- 支付：[src/lib/creem.ts](/Users/huanglu/Documents/Code/25-meditation-studio/src/lib/creem.ts)
 - Supabase：[src/lib/supabase.ts](/Users/huanglu/Documents/Code/25-meditation-studio/src/lib/supabase.ts)
 - 安全 URL 工具：[src/lib/urls.ts](/Users/huanglu/Documents/Code/25-meditation-studio/src/lib/urls.ts)
 - 数据迁移：[supabase/migrations/20260409_initial_schema.sql](/Users/huanglu/Documents/Code/25-meditation-studio/supabase/migrations/20260409_initial_schema.sql)

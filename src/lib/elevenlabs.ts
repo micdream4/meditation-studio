@@ -59,6 +59,41 @@ const EXCLUDED_VOICE_TERMS = [
   "advertising",
 ] as const;
 
+export const CACHED_MEDITATION_LIBRARY_VOICES: Voice[] = [
+  {
+    id: "Mu5jxyqZOLIGltFpfalg",
+    name: "Jameson - Guided Meditation",
+    language: "en",
+    previewUrl: "/api/voices/preview?voiceId=Mu5jxyqZOLIGltFpfalg",
+    description: "Grounded male voice for breathwork and focus",
+  },
+  {
+    id: "KH1SQLVulwP6uG4O3nmT",
+    name: "Brad - Romantic & Gentle",
+    language: "en",
+    previewUrl: "/api/voices/preview?voiceId=KH1SQLVulwP6uG4O3nmT",
+    description: "Warm male voice for loving-kindness sessions",
+  },
+  {
+    id: "zA6D7RyKdc2EClouEMkP",
+    name: "AImee - Tranquil ASMR",
+    language: "en",
+    previewUrl: "/api/voices/preview?voiceId=zA6D7RyKdc2EClouEMkP",
+    description: "Soft intimate voice for sleep wind-down",
+  },
+  {
+    id: "pjcYQlDFKMbcOUp6F5GD",
+    name: "Brittney - Calm & Meditative",
+    language: "en",
+    previewUrl: "/api/voices/preview?voiceId=pjcYQlDFKMbcOUp6F5GD",
+    description: "Clear calm voice for body scans",
+  },
+];
+
+export function isKnownMeditationVoiceId(voiceId: string) {
+  return CACHED_MEDITATION_LIBRARY_VOICES.some((voice) => voice.id === voiceId);
+}
+
 function getPresetVoiceConfigs(): VoiceEnvConfig[] {
   return [
     {
@@ -136,7 +171,7 @@ async function listSharedMeditationVoices(): Promise<Voice[]> {
   const apiKey = getRequiredEnv("ELEVENLABS_API_KEY");
   const seen = new Map<string, SharedVoice>();
 
-  for (const term of MEDITATION_VOICE_SEARCH_TERMS) {
+  const requests = MEDITATION_VOICE_SEARCH_TERMS.map(async (term) => {
     const url = new URL("https://api.elevenlabs.io/v1/shared-voices");
     url.searchParams.set("search", term);
     url.searchParams.set("language", "en");
@@ -147,13 +182,27 @@ async function listSharedMeditationVoices(): Promise<Voice[]> {
       headers: {
         "xi-api-key": apiKey,
       },
+      signal: AbortSignal.timeout(3500),
     });
 
     if (!response.ok) {
       throw new Error(`ElevenLabs shared voice search failed: ${response.status}`);
     }
 
-    const body = (await response.json()) as SharedVoicesResponse;
+    return (await response.json()) as SharedVoicesResponse;
+  });
+
+  const results = await Promise.allSettled(requests);
+  if (results.every((result) => result.status === "rejected")) {
+    throw new Error("ElevenLabs shared voice search failed for every search term.");
+  }
+
+  for (const result of results) {
+    if (result.status !== "fulfilled") {
+      continue;
+    }
+
+    const body = result.value;
     for (const voice of body.voices ?? []) {
       if (voice.voice_id && voice.name && voice.preview_url) {
         seen.set(voice.voice_id, voice);
@@ -177,6 +226,7 @@ async function listSharedMeditationVoices(): Promise<Voice[]> {
       name: normalizeSharedVoiceName(voice.name!),
       language: "en",
       previewUrl: voice.preview_url,
+      description: voice.description ?? voice.descriptive,
     }));
 }
 
@@ -203,14 +253,7 @@ export async function listVoices(): Promise<Voice[]> {
     console.warn("Failed to load shared meditation voices:", error);
   }
 
-  const response = await getElevenLabsClient().voices.getAll();
-
-  return (response.voices ?? []).slice(0, 6).map((voice) => ({
-    id: voice.voice_id,
-    name: voice.name ?? "ElevenLabs Voice",
-    language: voice.labels?.accent === "chinese" ? "zh" : "en",
-    previewUrl: voice.preview_url ?? undefined,
-  }));
+  return CACHED_MEDITATION_LIBRARY_VOICES;
 }
 
 export function splitTextIntoChunks(text: string, maxLength = 800) {
@@ -279,4 +322,21 @@ export async function synthesizeSpeechSegments(
   }
 
   return Buffer.concat(buffers);
+}
+
+export async function synthesizeVoicePreview(voiceId: string) {
+  const previewText =
+    "Take a slow breath in. And gently let it go. Allow your attention to settle here.";
+  const audioStream = await getElevenLabsClient().textToSpeech.convert(voiceId, {
+    text: previewText,
+    model_id: getOptionalEnv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")!,
+    output_format: "mp3_44100_128",
+    voice_settings: {
+      stability: 0.78,
+      similarity_boost: 0.78,
+      speed: 0.82,
+    },
+  });
+
+  return Buffer.from(await streamToBuffer(audioStream as Readable));
 }

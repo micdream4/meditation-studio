@@ -29,6 +29,7 @@ export default function AccountPage() {
   const [sub, setSub] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [portalError, setPortalError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/subscription")
@@ -40,6 +41,7 @@ export default function AccountPage() {
 
   async function handlePortal() {
     setPortalLoading(true);
+    setPortalError(null);
     try {
       const res = await fetch("/api/subscription/portal", {
         method: "POST",
@@ -48,7 +50,10 @@ export default function AccountPage() {
       });
       const json = await res.json();
       if (json.success) window.location.href = json.data.portalUrl;
-    } catch { /* ignore */ }
+      else setPortalError(json.error?.message ?? "Billing portal is unavailable right now.");
+    } catch {
+      setPortalError("Billing portal is unavailable right now. Please try again later.");
+    }
     finally { setPortalLoading(false); }
   }
 
@@ -114,8 +119,13 @@ export default function AccountPage() {
                       <Button variant="secondary" loading={portalLoading} onClick={handlePortal} className="w-full">
                         Manage subscription
                       </Button>
+                      {portalError && (
+                        <p className="text-xs text-center px-3 py-2 rounded-xl" style={{ background: "rgba(192,84,74,0.08)", color: "var(--color-error)", border: "1px solid rgba(192,84,74,0.18)" }}>
+                          {portalError}
+                        </p>
+                      )}
                       <p className="text-xs text-center" style={{ color: "var(--color-text-faint)" }}>
-                        Cancel, update payment method, or view invoices via Stripe.
+                        Cancel, update payment method, or view invoices via Creem.
                       </p>
                     </div>
                   </>

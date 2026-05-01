@@ -6,6 +6,12 @@ import Navbar from "@/components/layout/Navbar";
 import AudioPlayer from "@/components/player/AudioPlayer";
 import Button from "@/components/ui/Button";
 import { IconPause, IconPlay } from "@/components/ui/Icons";
+import {
+  MUSIC_PREVIEW_VOLUME,
+  MUSIC_TRACKS,
+  getInitialMusicTrackId,
+  getMusicTrack,
+} from "@/lib/music";
 import type { GenerationDurationMinutes, GenerateRequest, GenerateResponse, Voice } from "@/types/api";
 
 type Mode = "mood" | "template" | "custom";
@@ -33,13 +39,6 @@ const THEMES = [
 
 const DURATIONS: GenerationDurationMinutes[] =
   process.env.NODE_ENV === "development" ? [1, 5, 10, 15, 20] : [5, 10, 15, 20];
-
-const MUSIC_TRACKS = [
-  { id: "none", label: "None", description: "Voice only", url: undefined },
-  { id: "rainforest-water", label: "Rainforest water", description: "Soft forest stream", url: "/music/rainforest-water.mp3" },
-  { id: "ocean-waves", label: "Ocean waves", description: "Slow coastal waves", url: "/music/ocean-waves.m4a" },
-  { id: "soft-rain", label: "Soft rain", description: "Gentle rain texture", url: "/music/soft-rain.m4a" },
-] as const;
 
 const STATUS_LABELS: Record<GenStatus, string> = {
   idle: "",
@@ -119,11 +118,9 @@ function ThemeMark({ theme, active }: { theme: ThemeValue; active: boolean }) {
 function CreatePageInner() {
   const searchParams = useSearchParams();
   const checkoutStatus = searchParams.get("checkout");
-  const defaultMusicTrackId =
-    process.env.NEXT_PUBLIC_DEFAULT_MUSIC_TRACK_ID?.trim() || "none";
-  const initialMusicTrackId = MUSIC_TRACKS.some((track) => track.id === defaultMusicTrackId)
-    ? defaultMusicTrackId
-    : "none";
+  const initialMusicTrackId = getInitialMusicTrackId(
+    process.env.NEXT_PUBLIC_DEFAULT_MUSIC_TRACK_ID,
+  );
   const [mode, setMode] = useState<Mode>("mood");
   const [mood, setMood] = useState<string>("anxious");
   const [moodDetail, setMoodDetail] = useState("");
@@ -139,6 +136,8 @@ function CreatePageInner() {
   const [voicesLoading, setVoicesLoading] = useState(true);
   const [voicesError, setVoicesError] = useState<string | null>(null);
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
+  const [voicePreviewLoadingId, setVoicePreviewLoadingId] = useState<string | null>(null);
+  const [voicePreviewError, setVoicePreviewError] = useState<string | null>(null);
   const voicePreviewRef = useRef<HTMLAudioElement | null>(null);
   const [previewingMusicId, setPreviewingMusicId] = useState<string | null>(null);
   const musicPreviewRef = useRef<HTMLAudioElement | null>(null);
@@ -149,12 +148,15 @@ function CreatePageInner() {
   const [scriptText, setScriptText] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioVoiceId, setAudioVoiceId] = useState<string | null>(null);
+  const [audioMusicTrackId, setAudioMusicTrackId] = useState<string | null>(null);
   const [generationInputSignature, setGenerationInputSignature] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [showScript, setShowScript] = useState(false);
-  const selectedMusicTrack = MUSIC_TRACKS.find((track) => track.id === musicTrackId) ?? MUSIC_TRACKS[0];
+  const generatedMusicTrack = getMusicTrack(audioMusicTrackId);
+  const selectedVoice = voices.find((voice) => voice.id === voiceId);
+  const selectedMusicTrack = getMusicTrack(musicTrackId);
 
   // Load voices
   useEffect(() => {
@@ -191,6 +193,7 @@ function CreatePageInner() {
 
   function handleVoicePreview(voice: Voice) {
     if (!voice.previewUrl) {
+      setVoicePreviewError("Preview is not available for this voice.");
       return;
     }
 
@@ -198,19 +201,37 @@ function CreatePageInner() {
       voicePreviewRef.current?.pause();
       voicePreviewRef.current = null;
       setPreviewingVoiceId(null);
+      setVoicePreviewLoadingId(null);
       return;
     }
 
     voicePreviewRef.current?.pause();
     musicPreviewRef.current?.pause();
     setPreviewingMusicId(null);
+    setVoicePreviewError(null);
+    setVoicePreviewLoadingId(voice.id);
     const audio = new Audio(voice.previewUrl);
+    audio.preload = "auto";
     voicePreviewRef.current = audio;
-    setPreviewingVoiceId(voice.id);
 
-    audio.onended = () => setPreviewingVoiceId(null);
-    audio.onerror = () => setPreviewingVoiceId(null);
-    audio.play().catch(() => setPreviewingVoiceId(null));
+    audio.onplaying = () => {
+      setVoicePreviewLoadingId(null);
+      setPreviewingVoiceId(voice.id);
+    };
+    audio.onended = () => {
+      setPreviewingVoiceId(null);
+      setVoicePreviewLoadingId(null);
+    };
+    audio.onerror = () => {
+      setPreviewingVoiceId(null);
+      setVoicePreviewLoadingId(null);
+      setVoicePreviewError("Voice preview is unavailable right now.");
+    };
+    audio.play().catch(() => {
+      setPreviewingVoiceId(null);
+      setVoicePreviewLoadingId(null);
+      setVoicePreviewError("Voice preview could not start.");
+    });
   }
 
   function handleMusicPreview(track: (typeof MUSIC_TRACKS)[number]) {
@@ -231,7 +252,7 @@ function CreatePageInner() {
 
     const audio = new Audio(track.url);
     audio.loop = true;
-    audio.volume = 0.55;
+    audio.volume = MUSIC_PREVIEW_VOLUME;
     musicPreviewRef.current = audio;
     setPreviewingMusicId(track.id);
 
@@ -270,7 +291,11 @@ function CreatePageInner() {
     return JSON.stringify(input);
   }
 
-  function pollForAudio(generationIdToPoll: string, expectedVoiceId: string) {
+  function pollForAudio(
+    generationIdToPoll: string,
+    expectedVoiceId: string,
+    expectedMusicTrackId: string,
+  ) {
     let attempts = 0;
     pollRef.current = setInterval(async () => {
       attempts++;
@@ -299,6 +324,7 @@ function CreatePageInner() {
           }
           setAudioUrl(u);
           setAudioVoiceId(expectedVoiceId);
+          setAudioMusicTrackId(expectedMusicTrackId);
           setStatus("ready");
         } else if (s2 === "failed") {
           if (pollRef.current) {
@@ -322,6 +348,7 @@ function CreatePageInner() {
     setScriptText(null);
     setAudioUrl(null);
     setAudioVoiceId(null);
+    setAudioMusicTrackId(null);
     setGenerationInputSignature(null);
     setErrorMsg(null);
     setGenerationId(null);
@@ -362,12 +389,13 @@ function CreatePageInner() {
       if (s === "audio_ready" && url) {
         setAudioUrl(url);
         setAudioVoiceId(requestedVoiceId);
+        setAudioMusicTrackId(musicTrackId);
         setStatus("ready");
         return;
       }
 
       setStatus("voice");
-      pollForAudio(gId, requestedVoiceId);
+      pollForAudio(gId, requestedVoiceId, musicTrackId);
     } catch {
       setStatus("failed");
       setErrorMsg("Network error. Please check your connection and try again.");
@@ -384,6 +412,7 @@ function CreatePageInner() {
     const requestedVoiceId = voiceId || "default";
     setStatus("voice");
     setAudioUrl(null);
+    setAudioMusicTrackId(null);
     setSavedMsg(null);
     setErrorMsg(null);
 
@@ -406,7 +435,7 @@ function CreatePageInner() {
         setShowScript(true);
       }
 
-      pollForAudio(generationId, requestedVoiceId);
+      pollForAudio(generationId, requestedVoiceId, musicTrackId);
     } catch {
       setStatus("failed");
       setErrorMsg("Network error. Please check your connection and try again.");
@@ -659,7 +688,14 @@ function CreatePageInner() {
                           title={v.name}
                         >
                           <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: voiceId === v.id ? "var(--color-accent)" : "var(--color-text-faint)" }} />
-                          <span className="truncate">{v.name}</span>
+                          <span className="min-w-0">
+                            <span className="block truncate">{v.name}</span>
+                            {v.description && (
+                              <span className="block truncate text-[11px] mt-0.5" style={{ color: "var(--color-text-faint)" }}>
+                                {v.description}
+                              </span>
+                            )}
+                          </span>
                         </button>
                         <button
                           type="button"
@@ -674,7 +710,12 @@ function CreatePageInner() {
                           aria-label={`${previewingVoiceId === v.id ? "Pause" : "Preview"} ${v.name}`}
                           title={v.previewUrl ? "Preview voice" : "No preview available"}
                         >
-                          {previewingVoiceId === v.id ? (
+                          {voicePreviewLoadingId === v.id ? (
+                            <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                            </svg>
+                          ) : previewingVoiceId === v.id ? (
                             <IconPause size={14} />
                           ) : (
                             <IconPlay size={13} />
@@ -682,6 +723,11 @@ function CreatePageInner() {
                         </button>
                       </div>
                     ))}
+                    {voicePreviewError && (
+                      <p className="text-[11px] px-1" style={{ color: "var(--color-error)" }}>
+                        {voicePreviewError}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -737,6 +783,15 @@ function CreatePageInner() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="rounded-2xl px-5 py-4 flex flex-wrap items-center gap-2 text-xs" style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", color: "var(--color-text-muted)" }}>
+              <span style={{ color: "var(--color-text-faint)" }}>Session</span>
+              <span className="font-medium" style={{ color: "var(--color-text)" }}>{duration} min</span>
+              <span style={{ color: "var(--color-text-faint)" }}>·</span>
+              <span className="font-medium" style={{ color: "var(--color-text)" }}>{selectedVoice?.name ?? "Select voice"}</span>
+              <span style={{ color: "var(--color-text-faint)" }}>·</span>
+              <span className="font-medium" style={{ color: "var(--color-text)" }}>{selectedMusicTrack.label}</span>
             </div>
 
             {/* Generate button */}
@@ -796,7 +851,7 @@ function CreatePageInner() {
                   <>
                     <AudioPlayer
                       ttsUrl={audioUrl}
-                      musicUrl={selectedMusicTrack.url}
+                      musicUrl={generatedMusicTrack.url}
                       title={`${mode === "mood" ? MOODS.find(m => m.value === mood)?.label : mode === "template" ? THEMES.find(t => t.value === theme)?.label : "Custom"} · ${duration} min`}
                       onSave={handleSave}
                       onDownload={handleDownload}

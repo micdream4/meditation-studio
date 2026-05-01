@@ -1,6 +1,6 @@
 # Meditation Studio
 
-Meditation Studio is a Next.js app for generating guided meditation scripts and audio with OpenRouter, ElevenLabs, Supabase, and Stripe.
+Meditation Studio is a Next.js app for generating guided meditation scripts and audio with OpenRouter, ElevenLabs, Supabase, and Creem.
 
 ## Development
 
@@ -17,4 +17,4 @@ Open [http://localhost:3000](http://localhost:3000).
 - `PROJECT_PROGRESS.md`
 - `MVP_TASK_LIST.md`
 - `PRICING_STRATEGY.md`
-- `STRIPE_SETUP.md`
+- `CREEM_SETUP.md`

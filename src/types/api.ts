@@ -177,6 +177,7 @@ export type Voice = {
   name: string
   language: 'en' | 'zh'
   previewUrl?: string
+  description?: string
 }
 
 // GET /api/voices
