@@ -58,12 +58,37 @@ export function getCreemBaseUrl() {
 }
 
 function getCreemEnv() {
+  const mode = getCreemMode();
   return {
-    apiKey: getRequiredEnv("CREEM_API_KEY"),
+    apiKey:
+      mode === "live"
+        ? getOptionalEnv("CREEM_LIVE_API_KEY") ?? getRequiredEnv("CREEM_API_KEY")
+        : getOptionalEnv("CREEM_TEST_API_KEY") ?? getRequiredEnv("CREEM_API_KEY"),
+    webhookSecret:
+      mode === "live"
+        ? getOptionalEnv("CREEM_LIVE_WEBHOOK_SECRET") ?? getRequiredEnv("CREEM_WEBHOOK_SECRET")
+        : getOptionalEnv("CREEM_TEST_WEBHOOK_SECRET") ?? getRequiredEnv("CREEM_WEBHOOK_SECRET"),
     testProductId: getOptionalEnv("CREEM_TEST_PRODUCT_ID"),
     monthlyProductId: getOptionalEnv("CREEM_MONTHLY_PRODUCT_ID"),
     yearlyProductId: getOptionalEnv("CREEM_YEARLY_PRODUCT_ID"),
   };
+}
+
+export function getAvailableCreemPlans(): Array<Exclude<SubscriptionPlan, null>> {
+  const { monthlyProductId, yearlyProductId } = getCreemEnv();
+
+  if (getCreemMode() === "test") {
+    return ["monthly"];
+  }
+
+  return [
+    ...(monthlyProductId ? (["monthly"] as const) : []),
+    ...(yearlyProductId ? (["yearly"] as const) : []),
+  ];
+}
+
+export function isCreemPlanConfigured(plan: Exclude<SubscriptionPlan, null>) {
+  return getAvailableCreemPlans().includes(plan);
 }
 
 async function creemRequest<T>(
@@ -106,14 +131,14 @@ export function getCreemProductId(plan: Exclude<SubscriptionPlan, null>) {
     return testProductId;
   }
 
-  if (!monthlyProductId) {
+  if (plan === "monthly" && !monthlyProductId) {
     throw new Error("Missing required environment variable: CREEM_MONTHLY_PRODUCT_ID");
   }
-  if (!yearlyProductId) {
+  if (plan === "yearly" && !yearlyProductId) {
     throw new Error("Missing required environment variable: CREEM_YEARLY_PRODUCT_ID");
   }
 
-  return plan === "monthly" ? monthlyProductId : yearlyProductId;
+  return plan === "monthly" ? monthlyProductId! : yearlyProductId!;
 }
 
 export function getPlanFromCreemProductId(productId: string | null | undefined): SubscriptionPlan {
@@ -177,7 +202,8 @@ export async function createCreemCustomerPortalLink(customerId: string) {
 }
 
 export function verifyCreemWebhookSignature(payload: string, signature: string) {
-  const secret = getRequiredEnv("CREEM_WEBHOOK_SECRET");
+  const { webhookSecret } = getCreemEnv();
+  const secret = webhookSecret;
   const expected = createHmac("sha256", secret).update(payload).digest("hex");
 
   try {

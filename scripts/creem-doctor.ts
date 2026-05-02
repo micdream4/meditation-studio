@@ -2,11 +2,6 @@ import { getMissingEnv, loadLocalEnv } from "./env-utils.ts";
 
 loadLocalEnv();
 
-const CREEM_ENV_KEYS = [
-  "CREEM_API_KEY",
-  "CREEM_WEBHOOK_SECRET",
-] as const;
-
 type CheckStatus = "ok" | "warn" | "fail";
 
 function printCheck(status: CheckStatus, label: string, detail?: string) {
@@ -24,6 +19,26 @@ function getBaseUrl() {
   return process.env.CREEM_MODE === "live"
     ? "https://api.creem.io/v1"
     : "https://test-api.creem.io/v1";
+}
+
+function getCreemApiKey() {
+  if (process.env.CREEM_MODE === "live") {
+    return process.env.CREEM_LIVE_API_KEY || process.env.CREEM_API_KEY;
+  }
+
+  return process.env.CREEM_TEST_API_KEY || process.env.CREEM_API_KEY;
+}
+
+function getCreemCredentialKeys() {
+  if (process.env.CREEM_MODE === "live") {
+    return process.env.CREEM_LIVE_API_KEY || process.env.CREEM_LIVE_WEBHOOK_SECRET
+      ? (["CREEM_LIVE_API_KEY", "CREEM_LIVE_WEBHOOK_SECRET"] as const)
+      : (["CREEM_API_KEY", "CREEM_WEBHOOK_SECRET"] as const);
+  }
+
+  return process.env.CREEM_TEST_API_KEY || process.env.CREEM_TEST_WEBHOOK_SECRET
+    ? (["CREEM_TEST_API_KEY", "CREEM_TEST_WEBHOOK_SECRET"] as const)
+    : (["CREEM_API_KEY", "CREEM_WEBHOOK_SECRET"] as const);
 }
 
 async function checkCreemApiReachable() {
@@ -51,14 +66,15 @@ async function checkCreemApiReachable() {
 }
 
 async function checkProduct(productId: string, label: string) {
-  if (!process.env.CREEM_API_KEY) return false;
+  const apiKey = getCreemApiKey();
+  if (!apiKey) return false;
 
   try {
     const response = await fetch(
       `${getBaseUrl()}/products?product_id=${encodeURIComponent(productId)}`,
       {
       headers: {
-        "x-api-key": process.env.CREEM_API_KEY,
+        "x-api-key": apiKey,
       },
       signal: AbortSignal.timeout(12_000),
       },
@@ -89,9 +105,10 @@ async function main() {
   const apiReachable = await checkCreemApiReachable();
   const productEnvKeys =
     process.env.CREEM_MODE === "live"
-      ? (["CREEM_MONTHLY_PRODUCT_ID", "CREEM_YEARLY_PRODUCT_ID"] as const)
+      ? (["CREEM_MONTHLY_PRODUCT_ID"] as const)
       : (["CREEM_TEST_PRODUCT_ID"] as const);
-  const requiredEnvKeys = [...CREEM_ENV_KEYS, ...productEnvKeys] as const;
+  const credentialEnvKeys = getCreemCredentialKeys();
+  const requiredEnvKeys = [...credentialEnvKeys, ...productEnvKeys] as const;
   const missing = getMissingEnv(requiredEnvKeys);
 
   for (const key of requiredEnvKeys) {
@@ -102,14 +119,24 @@ async function main() {
     }
   }
 
-  if (process.env.CREEM_WEBHOOK_SECRET && process.env.CREEM_WEBHOOK_SECRET.length < 16) {
-    printCheck("warn", "CREEM_WEBHOOK_SECRET", "looks short; verify it came from Creem webhook settings");
+  const webhookSecret =
+    process.env.CREEM_MODE === "live"
+      ? process.env.CREEM_LIVE_WEBHOOK_SECRET || process.env.CREEM_WEBHOOK_SECRET
+      : process.env.CREEM_TEST_WEBHOOK_SECRET || process.env.CREEM_WEBHOOK_SECRET;
+
+  if (webhookSecret && webhookSecret.length < 16) {
+    printCheck("warn", "Creem webhook secret", "looks short; verify it came from Creem webhook settings");
   }
 
   let productsOk = false;
-  if (process.env.CREEM_MODE === "live" && process.env.CREEM_MONTHLY_PRODUCT_ID && process.env.CREEM_YEARLY_PRODUCT_ID) {
+  if (process.env.CREEM_MODE === "live" && process.env.CREEM_MONTHLY_PRODUCT_ID) {
     const monthlyOk = await checkProduct(process.env.CREEM_MONTHLY_PRODUCT_ID, "Monthly");
-    const yearlyOk = await checkProduct(process.env.CREEM_YEARLY_PRODUCT_ID, "Yearly");
+    const yearlyOk = process.env.CREEM_YEARLY_PRODUCT_ID
+      ? await checkProduct(process.env.CREEM_YEARLY_PRODUCT_ID, "Yearly")
+      : true;
+    if (!process.env.CREEM_YEARLY_PRODUCT_ID) {
+      printCheck("warn", "Yearly Product", "not configured; yearly checkout will stay hidden");
+    }
     productsOk = monthlyOk && yearlyOk;
   } else if (process.env.CREEM_MODE !== "live" && process.env.CREEM_TEST_PRODUCT_ID) {
     productsOk = await checkProduct(process.env.CREEM_TEST_PRODUCT_ID, "Test $1");

@@ -11,14 +11,16 @@ Add these values to `.env.local`:
 
 ```bash
 CREEM_MODE=test
-CREEM_API_KEY=creem_test_...
-CREEM_WEBHOOK_SECRET=...
+CREEM_TEST_API_KEY=creem_test_...
+CREEM_TEST_WEBHOOK_SECRET=...
 CREEM_TEST_PRODUCT_ID=prod_...
+CREEM_LIVE_API_KEY=creem_live_...
+CREEM_LIVE_WEBHOOK_SECRET=...
 CREEM_MONTHLY_PRODUCT_ID=prod_...
 CREEM_YEARLY_PRODUCT_ID=prod_...
 ```
 
-`CREEM_MODE` controls both the checkout API endpoint and the pricing UI. Use `CREEM_MODE=live` only after the full test flow passes.
+`CREEM_MODE` controls both the checkout API endpoint and the pricing UI. Use `CREEM_MODE=test` for the sandbox API and `CREEM_MODE=live` for production.
 
 ## Creem Dashboard
 
@@ -34,16 +36,16 @@ CREEM_TEST_PRODUCT_ID=
 
 In test mode, both monthly and yearly buttons intentionally use this one `$1` test product. The selected plan is still sent in metadata so webhook sync can test both app states without risking a large charge.
 
-For live mode, create two subscription products:
+For live mode, create at least one subscription product:
 
 - Monthly: `$19/month`
-- Yearly: `$159/year`
+- Yearly: `$159/year` (optional; leave it unset until the annual plan is ready)
 
-Copy their Product IDs into:
+Copy the Product IDs into:
 
 ```bash
 CREEM_MONTHLY_PRODUCT_ID=
-CREEM_YEARLY_PRODUCT_ID=
+CREEM_YEARLY_PRODUCT_ID= # optional
 ```
 
 ## Webhook
@@ -84,20 +86,20 @@ Required events:
 Creem test mode and production are separate environments. When switching to live mode:
 
 1. Turn off Test Mode in the Creem dashboard.
-2. Create two live recurring products:
+2. Create live recurring products:
    - `Meditation Studio Monthly`: `$19/month`
-   - `Meditation Studio Yearly`: `$159/year`
+   - `Meditation Studio Yearly`: `$159/year` (optional)
 3. Copy the live product IDs into Vercel:
 
 ```bash
 CREEM_MODE=live
-CREEM_API_KEY=creem_live_...
-CREEM_WEBHOOK_SECRET=...
+CREEM_LIVE_API_KEY=creem_live_...
+CREEM_LIVE_WEBHOOK_SECRET=...
 CREEM_MONTHLY_PRODUCT_ID=prod_live_monthly...
-CREEM_YEARLY_PRODUCT_ID=prod_live_yearly...
+CREEM_YEARLY_PRODUCT_ID=prod_live_yearly... # optional
 ```
 
-Keep `CREEM_TEST_PRODUCT_ID` if you still want local test mode, but production does not use it.
+Keep `CREEM_TEST_PRODUCT_ID` if you still want local test mode, but production does not use it. If `CREEM_YEARLY_PRODUCT_ID` is missing, the yearly price toggle stays hidden and only monthly checkout is available.
 
 4. In the live Creem dashboard, create a live webhook:
 
@@ -109,7 +111,7 @@ https://meditation-studio-ashy.vercel.app/api/subscription/webhook
 6. Open `/pricing` and confirm it shows `$19/month` and `$159/year`, not the `$1` test checkout.
 7. Complete one low-risk live checkout and confirm `/account` shows `Active`.
 
-Do not use `creem_test_...` API keys or test webhook secrets with `CREEM_MODE=live`.
+Do not use `creem_test_...` API keys or test webhook secrets with `CREEM_MODE=live`. If both test and live values are present, `CREEM_MODE` selects which pair is used.
 
 ## Validation
 

@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import type { SubscriptionPlan } from "@/types/api";
 import { apiError, apiSuccess, isRecord, readJson } from "@/lib/api";
 import { ensureUserProfile, getRequestUser } from "@/lib/auth";
-import { createCreemCheckoutSession, getCreemMode } from "@/lib/creem";
+import { createCreemCheckoutSession, getCreemMode, isCreemPlanConfigured } from "@/lib/creem";
 import { getSafeReturnUrl } from "@/lib/urls";
 
 export const runtime = "nodejs";
@@ -41,6 +41,15 @@ export async function POST(request: NextRequest) {
   successUrl.searchParams.set("checkout", "success");
 
   const plan = getCreemMode() === "test" ? "monthly" : body.plan;
+
+  if (!isCreemPlanConfigured(plan)) {
+    return apiError(
+      "plan_unavailable",
+      "This billing plan is not available yet.",
+      400,
+      response,
+    );
+  }
 
   let checkoutUrl: string;
   try {

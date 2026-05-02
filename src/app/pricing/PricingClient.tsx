@@ -5,6 +5,7 @@ import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import Button from "@/components/ui/Button";
+import type { SubscriptionPlan } from "@/types/api";
 
 const FEATURES = [
   { icon: "◷", label: "Monthly: 30 generation credits" },
@@ -43,13 +44,23 @@ const FAQ = [
 
 type BillingPlan = "monthly" | "yearly";
 
-export default function PricingClient({ isTestCheckout }: { isTestCheckout: boolean }) {
-  const [billing, setBilling] = useState<BillingPlan>("yearly");
+export default function PricingClient({
+  availablePlans,
+  isTestCheckout,
+}: {
+  availablePlans: Array<Exclude<SubscriptionPlan, null>>;
+  isTestCheckout: boolean;
+}) {
+  const yearlyAvailable = availablePlans.includes("yearly");
+  const availableBillingPlans = availablePlans.length > 0 ? availablePlans : (["monthly"] as const);
+  const [billing, setBilling] = useState<BillingPlan>(
+    yearlyAvailable ? "yearly" : availableBillingPlans[0],
+  );
   const [loading, setLoading] = useState<BillingPlan | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const checkoutPlan: BillingPlan = isTestCheckout ? "monthly" : billing;
-  const features = isTestCheckout
+  const features = isTestCheckout || !yearlyAvailable
     ? FEATURES.filter((feature) => !feature.label.startsWith("Yearly:"))
     : FEATURES;
 
@@ -124,7 +135,7 @@ export default function PricingClient({ isTestCheckout }: { isTestCheckout: bool
         {/* ── Billing toggle + Cards ── */}
         <section className="max-w-xl mx-auto px-6 pb-20">
 
-          {!isTestCheckout && (
+          {!isTestCheckout && yearlyAvailable && (
             <div className="flex justify-center mb-10">
               <div
                 className="relative grid grid-cols-2 items-center p-1 rounded-full text-sm w-[320px] max-w-full"
@@ -139,7 +150,7 @@ export default function PricingClient({ isTestCheckout }: { isTestCheckout: bool
                     width: "calc(50% - 6px)",
                   }}
                 />
-                {(["monthly", "yearly"] as const).map((b) => (
+                {availableBillingPlans.map((b) => (
                   <button
                     key={b}
                     onClick={() => setBilling(b)}
@@ -174,12 +185,12 @@ export default function PricingClient({ isTestCheckout }: { isTestCheckout: bool
                 <div className="text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
                   {isTestCheckout ? "/month test" : billing === "monthly" ? "/month" : "/year"}
                 </div>
-                {!isTestCheckout && billing === "yearly" && (
+                {!isTestCheckout && yearlyAvailable && billing === "yearly" && (
                   <div className="text-xs" style={{ color: "var(--color-text-faint)" }}>$13.25/mo equivalent</div>
                 )}
               </div>
             </div>
-            {!isTestCheckout && billing === "yearly" && (
+            {!isTestCheckout && yearlyAvailable && billing === "yearly" && (
               <div
                 className="inline-block mt-2 text-xs px-3 py-1 rounded-full font-medium"
                 style={{ background: "rgba(107,143,113,0.1)", color: "var(--color-accent)" }}
