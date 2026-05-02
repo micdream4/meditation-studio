@@ -464,10 +464,16 @@ function CreatePageInner() {
 
   async function handleDownload() {
     if (!audioUrl) return;
+    const hasMusic = Boolean(audioMusicTrackId && audioMusicTrackId !== "none");
+    const downloadUrl = hasMusic && generationId
+      ? `/api/generate/${generationId}/download`
+      : audioUrl;
+    const extension = hasMusic ? "wav" : "mp3";
+
     try {
-      await downloadAudioFile(audioUrl, `meditation-${duration}min.mp3`);
+      await downloadAudioFile(downloadUrl, `meditation-${duration}min.${extension}`);
     } catch {
-      window.location.href = audioUrl;
+      window.location.href = downloadUrl;
     }
   }
 

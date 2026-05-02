@@ -17,6 +17,7 @@
     "generate-music": "python3 scripts/generate_music.py"
   },
   "dependencies": {
+    "@audio/decode-mp3": "^1.1.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.0",
     "elevenlabs": "^1.59.0",

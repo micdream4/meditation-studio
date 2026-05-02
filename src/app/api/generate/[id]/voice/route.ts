@@ -9,6 +9,7 @@ import {
   getGenerationCreditCost,
   hasEnoughGenerationCredits,
 } from "@/lib/credits";
+import { AUDIO_BUCKET } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -117,6 +118,26 @@ export async function POST(
 
   if (updateError) {
     throw updateError;
+  }
+
+  const exportFolder = `exports/generated/${user.id}`;
+  const { data: exportedFiles, error: exportListError } = await admin.storage
+    .from(AUDIO_BUCKET)
+    .list(exportFolder, {
+      search: `${id}-`,
+    });
+
+  if (exportListError) {
+    console.error("Failed to list generated audio exports", exportListError);
+  } else if (exportedFiles && exportedFiles.length > 0) {
+    const staleExportPaths = exportedFiles.map((file) => `${exportFolder}/${file.name}`);
+    const { error: exportRemoveError } = await admin.storage
+      .from(AUDIO_BUCKET)
+      .remove(staleExportPaths);
+
+    if (exportRemoveError) {
+      console.error("Failed to remove stale generated audio exports", exportRemoveError);
+    }
   }
 
   after(async () => {

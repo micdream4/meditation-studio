@@ -53,10 +53,16 @@ export default function LibraryPage() {
   }
 
   async function handleDownload(track: SavedTrack) {
+    const hasMusic = Boolean(getMusicTrack(track.musicTrackId).url);
+    const downloadUrl = hasMusic
+      ? `/api/library/${track.id}/download`
+      : track.storageUrl;
+    const extension = hasMusic ? "wav" : "mp3";
+
     try {
-      await downloadAudioFile(track.storageUrl, `${track.title}.mp3`);
+      await downloadAudioFile(downloadUrl, `${track.title}.${extension}`);
     } catch {
-      window.location.href = track.storageUrl;
+      window.location.href = downloadUrl;
     }
   }
 
