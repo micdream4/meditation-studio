@@ -4,6 +4,12 @@ import { ElevenLabsClient } from "elevenlabs";
 
 import type { Voice } from "@/types/api";
 import { getOptionalEnv, getRequiredEnv } from "@/lib/env";
+import {
+  VOICE_LAB_PRESETS,
+  getVoiceLabPreset,
+  type VoiceLabPresetId,
+  type VoiceLabSettings,
+} from "@/lib/voice-lab";
 
 let elevenLabsClient: ElevenLabsClient | null = null;
 
@@ -297,6 +303,13 @@ function getMeditationSpeed(speechRate?: "slow" | "normal" | "fast") {
   return 0.7;
 }
 
+function getMeditationVoiceSettings(speechRate?: "slow" | "normal" | "fast"): VoiceLabSettings {
+  return {
+    ...VOICE_LAB_PRESETS[0]!.settings,
+    speed: getMeditationSpeed(speechRate),
+  };
+}
+
 export async function synthesizeSpeechSegments(
   text: string,
   voiceId: string,
@@ -312,13 +325,7 @@ export async function synthesizeSpeechSegments(
       output_format: "mp3_44100_128",
       previous_text: chunks[index - 1],
       next_text: chunks[index + 1],
-      voice_settings: {
-        stability: 0.48,
-        similarity_boost: 0.72,
-        style: 0.28,
-        use_speaker_boost: true,
-        speed: getMeditationSpeed(speechRate),
-      },
+      voice_settings: getMeditationVoiceSettings(speechRate),
     });
 
     buffers.push(Buffer.from(await streamToBuffer(audioStream as Readable)));
@@ -341,6 +348,31 @@ export async function synthesizeVoicePreview(voiceId: string) {
       use_speaker_boost: true,
       speed: 0.76,
     },
+  });
+
+  return Buffer.from(await streamToBuffer(audioStream as Readable));
+}
+
+export async function synthesizeVoiceLabSample({
+  voiceId,
+  presetId,
+  text,
+}: {
+  voiceId: string;
+  presetId: VoiceLabPresetId;
+  text: string;
+}) {
+  const preset = getVoiceLabPreset(presetId);
+
+  if (!preset) {
+    throw new Error("Unknown voice lab preset.");
+  }
+
+  const audioStream = await getElevenLabsClient().textToSpeech.convert(voiceId, {
+    text: normalizePauseMarkers(text),
+    model_id: getOptionalEnv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")!,
+    output_format: "mp3_44100_128",
+    voice_settings: preset.settings,
   });
 
   return Buffer.from(await streamToBuffer(audioStream as Readable));

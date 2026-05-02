@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createMiddlewareSupabaseClient } from "@/lib/supabase";
 
-const PROTECTED_PATHS = ["/create", "/library", "/account"];
+const PROTECTED_PATHS = ["/create", "/library", "/account", "/voice-lab"];
 
 function isProtectedPath(pathname: string) {
   return PROTECTED_PATHS.some(
@@ -26,5 +26,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/create/:path*", "/library/:path*", "/account/:path*"],
+  matcher: ["/create/:path*", "/library/:path*", "/account/:path*", "/voice-lab/:path*"],
 };

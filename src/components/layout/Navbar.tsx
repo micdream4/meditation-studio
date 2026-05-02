@@ -100,6 +100,7 @@ export default function Navbar() {
             <>
               <Link href="/create" className="nav-link text-sm" style={{ color: "var(--color-text-muted)" }}>Create</Link>
               <Link href="/library" className="nav-link text-sm" style={{ color: "var(--color-text-muted)" }}>Library</Link>
+              <Link href="/voice-lab" className="nav-link text-sm" style={{ color: "var(--color-text-muted)" }}>Voice Lab</Link>
               <Link
                 href="/account"
                 className="max-w-48 truncate text-sm px-5 py-2 rounded-full font-medium transition-all duration-200 hover:opacity-90"
@@ -174,6 +175,7 @@ export default function Navbar() {
               <>
                 <Link href="/create" className="text-sm text-center py-2.5 rounded-xl transition-colors" style={{ color: "var(--color-text-muted)", border: "1px solid var(--color-border)" }} onClick={() => setMenuOpen(false)}>Create</Link>
                 <Link href="/library" className="text-sm text-center py-2.5 rounded-xl transition-colors" style={{ color: "var(--color-text-muted)", border: "1px solid var(--color-border)" }} onClick={() => setMenuOpen(false)}>Library</Link>
+                <Link href="/voice-lab" className="text-sm text-center py-2.5 rounded-xl transition-colors" style={{ color: "var(--color-text-muted)", border: "1px solid var(--color-border)" }} onClick={() => setMenuOpen(false)}>Voice Lab</Link>
                 <Link href="/account" className="truncate text-sm text-center py-2.5 px-4 rounded-xl font-medium" style={{ background: "linear-gradient(140deg, #78a07e 0%, #5a7a60 100%)", color: "#fff" }} title={accountLabel} onClick={() => setMenuOpen(false)}>{accountLabel}</Link>
               </>
             ) : (
