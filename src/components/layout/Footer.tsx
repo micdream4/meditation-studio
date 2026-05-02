@@ -64,8 +64,8 @@ export default function Footer() {
         >
           <span>© {new Date().getFullYear()} Meditation Studio. All rights reserved.</span>
           <div className="flex gap-5">
-            <Link href="/privacy" className="nav-link w-fit">Privacy</Link>
-            <Link href="/terms"   className="nav-link w-fit">Terms</Link>
+            <Link href="/privacy" className="nav-link w-fit">Privacy Policy</Link>
+            <Link href="/terms"   className="nav-link w-fit">Terms of Service</Link>
           </div>
         </div>
       </div>
