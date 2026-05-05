@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { isVoiceLabAdminEmail } from "@/lib/admin-access";
 import { createMiddlewareSupabaseClient } from "@/lib/supabase";
 
 const PROTECTED_PATHS = ["/create", "/library", "/account", "/voice-lab"];
@@ -20,6 +21,15 @@ export async function proxy(request: NextRequest) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirectTo", request.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  if (
+    user &&
+    (request.nextUrl.pathname === "/voice-lab" ||
+      request.nextUrl.pathname.startsWith("/voice-lab/")) &&
+    !isVoiceLabAdminEmail(user.email)
+  ) {
+    return NextResponse.redirect(new URL("/account", request.url));
   }
 
   return response;

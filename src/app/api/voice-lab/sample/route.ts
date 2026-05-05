@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { isVoiceLabAdminEmail } from "@/lib/admin-access";
 import { apiError, isRecord, readJson } from "@/lib/api";
 import { ensureUserProfile, getRequestUser, getUserProfile } from "@/lib/auth";
 import { synthesizeVoiceLabSample } from "@/lib/elevenlabs";
@@ -43,6 +44,10 @@ export async function POST(request: NextRequest) {
 
   if (!user) {
     return apiError("unauthorized", "You must be logged in.", 401, response);
+  }
+
+  if (!isVoiceLabAdminEmail(user.email)) {
+    return apiError("forbidden", "Voice Lab is restricted to administrators.", 403, response);
   }
 
   await ensureUserProfile(user.id, user.email ?? null);
