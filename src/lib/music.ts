@@ -27,12 +27,14 @@ export const MUSIC_TRACKS = [
     label: "Ocean waves",
     description: "Slow coastal wash",
     url: "/music/ocean-waves.m4a",
+    exportUrl: "/music/ocean-waves.wav",
   },
   {
     id: "soft-rain",
     label: "Soft rain",
     description: "Even rain bed",
     url: "/music/soft-rain.m4a",
+    exportUrl: "/music/soft-rain.wav",
   },
 ] as const satisfies readonly MusicTrack[];
 

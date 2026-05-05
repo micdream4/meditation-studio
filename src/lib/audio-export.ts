@@ -3,7 +3,13 @@ import decodeMp3 from "@audio/decode-mp3";
 import { DEFAULT_MUSIC_VOLUME } from "@/lib/music";
 
 const EXPORT_SAMPLE_RATE = 24_000;
-const EXPORT_MUSIC_VOLUME = DEFAULT_MUSIC_VOLUME * 1.35;
+const EXPORT_MUSIC_VOLUME = DEFAULT_MUSIC_VOLUME * 1.12;
+const MUSIC_FADE_IN_SECONDS = 3;
+const MUSIC_FADE_OUT_SECONDS = 5;
+const MUSIC_LOOP_CROSSFADE_SECONDS = 1.5;
+const SPEECH_DUCK_THRESHOLD = 0.012;
+const SPEECH_DUCK_RANGE = 0.07;
+const MUSIC_DUCK_FLOOR = 0.46;
 
 type PcmAudioData = {
   channelData: Float32Array[];
@@ -99,7 +105,31 @@ function sampleMono(audio: PcmAudioData, frame: number) {
 function sampleLoopingMono(audio: PcmAudioData, frame: number) {
   const length = audio.channelData[0]?.length ?? 0;
   if (length === 0) return 0;
-  return sampleMono(audio, frame % length);
+  const loopFrame = ((frame % length) + length) % length;
+  const crossfadeFrames = Math.min(
+    Math.floor(audio.sampleRate * MUSIC_LOOP_CROSSFADE_SECONDS),
+    Math.floor(length / 4),
+  );
+
+  if (crossfadeFrames > 0 && loopFrame > length - crossfadeFrames) {
+    const amount = (loopFrame - (length - crossfadeFrames)) / crossfadeFrames;
+    const endSample = sampleMono(audio, loopFrame);
+    const startSample = sampleMono(audio, loopFrame - length + crossfadeFrames);
+    return endSample * (1 - amount) + startSample * amount;
+  }
+
+  return sampleMono(audio, loopFrame);
+}
+
+function smoothStep(value: number) {
+  const x = Math.max(0, Math.min(1, value));
+  return x * x * (3 - 2 * x);
+}
+
+function getFadeGain(timeSeconds: number, durationSeconds: number) {
+  const fadeIn = Math.min(1, timeSeconds / MUSIC_FADE_IN_SECONDS);
+  const fadeOut = Math.min(1, (durationSeconds - timeSeconds) / MUSIC_FADE_OUT_SECONDS);
+  return Math.max(0, Math.min(1, fadeIn, fadeOut));
 }
 
 function writeAscii(view: DataView, offset: number, value: string) {
@@ -150,11 +180,27 @@ export async function mixMeditationAudioToWav({
   const durationSeconds = speechLength / speech.sampleRate;
   const outputFrames = Math.max(1, Math.ceil(durationSeconds * EXPORT_SAMPLE_RATE));
   const samples = new Int16Array(outputFrames);
+  const envelopeAttack = 1 - Math.exp(-1 / (EXPORT_SAMPLE_RATE * 0.025));
+  const envelopeRelease = 1 - Math.exp(-1 / (EXPORT_SAMPLE_RATE * 0.35));
+  let speechEnvelope = 0;
 
   for (let i = 0; i < outputFrames; i++) {
     const t = i / EXPORT_SAMPLE_RATE;
     const speechSample = sampleMono(speech, t * speech.sampleRate);
-    const musicSample = sampleLoopingMono(music, t * music.sampleRate) * EXPORT_MUSIC_VOLUME;
+    const speechLevel = Math.abs(speechSample);
+    const smoothing = speechLevel > speechEnvelope ? envelopeAttack : envelopeRelease;
+    speechEnvelope += (speechLevel - speechEnvelope) * smoothing;
+
+    const speechActivity = smoothStep(
+      (speechEnvelope - SPEECH_DUCK_THRESHOLD) / SPEECH_DUCK_RANGE,
+    );
+    const duckGain = 1 - speechActivity * (1 - MUSIC_DUCK_FLOOR);
+    const fadeGain = getFadeGain(t, durationSeconds);
+    const musicSample =
+      sampleLoopingMono(music, t * music.sampleRate) *
+      EXPORT_MUSIC_VOLUME *
+      duckGain *
+      fadeGain;
     const limited = Math.tanh((speechSample * 0.98 + musicSample) * 1.05);
     samples[i] = Math.round(clamp16Bit(limited) * 32767);
   }
