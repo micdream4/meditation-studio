@@ -18,6 +18,8 @@ function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const plan = searchParams.get("plan");
+  const appOrigin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "";
+  const authRedirectTo = `${appOrigin || (typeof window !== "undefined" ? window.location.origin : "")}/auth/callback?redirectTo=${plan ? `/pricing?plan=${plan}` : "/pricing"}`;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,7 +39,7 @@ function SignupForm() {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?redirectTo=${plan ? `/pricing?plan=${plan}` : "/pricing"}` },
+      options: { emailRedirectTo: authRedirectTo },
     });
     setLoading(false);
     if (error) {
@@ -56,7 +58,7 @@ function SignupForm() {
     const supabase = createBrowserSupabaseClient();
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback?redirectTo=${plan ? `/pricing?plan=${plan}` : "/pricing"}` },
+      options: { redirectTo: authRedirectTo },
     });
   }
 

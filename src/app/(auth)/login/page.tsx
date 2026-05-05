@@ -19,6 +19,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = getSafeInternalPath(searchParams.get("redirectTo"), "/create");
+  const appOrigin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,9 +45,10 @@ function LoginForm() {
   async function handleGoogle() {
     setOauthLoading(true);
     const supabase = createBrowserSupabaseClient();
+    const origin = appOrigin || window.location.origin;
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback?redirectTo=${redirectTo}` },
+      options: { redirectTo: `${origin}/auth/callback?redirectTo=${redirectTo}` },
     });
   }
 

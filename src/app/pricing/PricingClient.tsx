@@ -47,9 +47,13 @@ type BillingPlan = "monthly" | "yearly";
 export default function PricingClient({
   availablePlans,
   isTestCheckout,
+  monthlyPriceUsd,
+  yearlyPriceUsd,
 }: {
   availablePlans: Array<Exclude<SubscriptionPlan, null>>;
   isTestCheckout: boolean;
+  monthlyPriceUsd: number;
+  yearlyPriceUsd: number;
 }) {
   const yearlyAvailable = availablePlans.includes("yearly");
   const availableBillingPlans = availablePlans.length > 0 ? availablePlans : (["monthly"] as const);
@@ -60,6 +64,9 @@ export default function PricingClient({
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const checkoutPlan: BillingPlan = isTestCheckout ? "monthly" : billing;
+  const monthlyPriceLabel = `$${monthlyPriceUsd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  const yearlyPriceLabel = `$${yearlyPriceUsd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  const yearlyMonthlyEquivalent = yearlyPriceUsd / 12;
   const features = isTestCheckout || !yearlyAvailable
     ? FEATURES.filter((feature) => !feature.label.startsWith("Yearly:"))
     : FEATURES;
@@ -179,14 +186,16 @@ export default function PricingClient({
                 className="text-[76px] leading-none font-bold tracking-tight transition-all duration-300"
                 style={{ fontFamily: "var(--font-display)", color: "var(--color-text)" }}
               >
-                {isTestCheckout ? "$1" : billing === "monthly" ? "$19" : "$159"}
+                {isTestCheckout ? "$1" : billing === "monthly" ? monthlyPriceLabel : yearlyPriceLabel}
               </span>
               <div className="pb-3 text-left">
                 <div className="text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
                   {isTestCheckout ? "/month test" : billing === "monthly" ? "/month" : "/year"}
                 </div>
                 {!isTestCheckout && yearlyAvailable && billing === "yearly" && (
-                  <div className="text-xs" style={{ color: "var(--color-text-faint)" }}>$13.25/mo equivalent</div>
+                  <div className="text-xs" style={{ color: "var(--color-text-faint)" }}>
+                    ${yearlyMonthlyEquivalent.toLocaleString("en-US", { maximumFractionDigits: 2 })}/mo equivalent
+                  </div>
                 )}
               </div>
             </div>
