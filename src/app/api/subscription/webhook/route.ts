@@ -42,7 +42,14 @@ export async function POST(request: Request) {
   ]);
 
   if (event.eventType && syncEvents.has(event.eventType)) {
-    await syncCreemWebhookEvent(event);
+    const result = await syncCreemWebhookEvent(event);
+    console.log("Creem webhook processed", {
+      eventType: event.eventType,
+      synced: result.synced,
+      reason: result.reason,
+      subscriptionId: result.subscriptionId,
+      status: result.status,
+    });
   }
 
   return apiSuccess({ received: true });

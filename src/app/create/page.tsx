@@ -501,7 +501,7 @@ function CreatePageInner() {
                 <circle cx="8" cy="8" r="8" fill="rgba(107,143,113,0.2)" />
                 <path d="M5 8l2 2 4-4" stroke="#6b8f71" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              Subscription activated — you&apos;re all set. Create your first session below.
+              Checkout complete — we&apos;re confirming your subscription. Create your first session below.
             </div>
           )}
           {checkoutStatus === "canceled" && (

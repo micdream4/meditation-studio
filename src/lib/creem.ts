@@ -28,7 +28,7 @@ type CreemCheckoutObject = {
   id?: string;
   customer?: CreemCustomer;
   product?: CreemProduct;
-  subscription?: CreemSubscription | null;
+  subscription?: string | CreemSubscription | null;
   metadata?: Record<string, unknown> | null;
   request_id?: string;
 };
@@ -37,6 +37,14 @@ export type CreemWebhookEvent = {
   id?: string;
   eventType?: string;
   object?: CreemCheckoutObject | CreemSubscription;
+};
+
+export type CreemSyncResult = {
+  synced: boolean;
+  reason?: string;
+  userId?: string;
+  subscriptionId?: string | null;
+  status?: SubscriptionStatus;
 };
 
 type CreemCheckoutResponse = {
@@ -252,10 +260,72 @@ function getMetadataString(
 
 function getCheckoutSubscription(value: CreemWebhookEvent["object"]) {
   if (!value || !("subscription" in value)) return null;
-  return value.subscription ?? null;
+  if (!value.subscription) return null;
+  if (typeof value.subscription === "string") {
+    return { id: value.subscription } satisfies CreemSubscription;
+  }
+  return value.subscription;
 }
 
-export async function syncCreemWebhookEvent(event: CreemWebhookEvent) {
+function isSubscriptionEvent(eventType: string) {
+  return eventType.startsWith("subscription.");
+}
+
+function getSubscriptionForEvent(
+  eventType: string,
+  object: CreemWebhookEvent["object"],
+) {
+  const checkoutSubscription = getCheckoutSubscription(object);
+  if (checkoutSubscription) {
+    return checkoutSubscription;
+  }
+
+  if (isSubscriptionEvent(eventType)) {
+    return object as CreemSubscription;
+  }
+
+  return null;
+}
+
+async function resolveWebhookUserId({
+  admin,
+  metadataUserId,
+  subscriptionId,
+  customerId,
+}: {
+  admin: ReturnType<typeof createAdminSupabaseClient>;
+  metadataUserId: string | null;
+  subscriptionId: string | null;
+  customerId: string | null;
+}) {
+  if (metadataUserId) return metadataUserId;
+
+  if (subscriptionId) {
+    const { data, error } = await admin
+      .from("users")
+      .select("id")
+      .eq("creem_subscription_id", subscriptionId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data?.id) return data.id;
+  }
+
+  if (customerId) {
+    const { data, error } = await admin
+      .from("users")
+      .select("id")
+      .eq("creem_customer_id", customerId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data?.id) return data.id;
+  }
+
+  return null;
+}
+
+export async function syncCreemWebhookEvent(event: CreemWebhookEvent): Promise<CreemSyncResult> {
   const eventType = event.eventType;
   const object = event.object;
 
@@ -263,24 +333,56 @@ export async function syncCreemWebhookEvent(event: CreemWebhookEvent) {
     throw new Error("Invalid Creem webhook event.");
   }
 
-  const subscription = getCheckoutSubscription(object) ?? object as CreemSubscription;
-  const metadata = subscription.metadata ?? object.metadata ?? null;
-  const userId =
-    getMetadataString(metadata, "userId") ??
-    getMetadataString(metadata, "internal_customer_id");
+  const subscription = getSubscriptionForEvent(eventType, object);
+  const admin = createAdminSupabaseClient();
+  const metadata = subscription?.metadata ?? object.metadata ?? null;
+  const productId = (subscription ? getProductId(subscription) : null) ?? getProductId(object);
+  const customerId = (subscription ? getCustomerId(subscription) : null) ?? getCustomerId(object);
+  const subscriptionId = subscription?.id ?? null;
+  const userId = await resolveWebhookUserId({
+    admin,
+    metadataUserId:
+      getMetadataString(metadata, "userId") ??
+      getMetadataString(metadata, "internal_customer_id"),
+    subscriptionId,
+    customerId,
+  });
 
   if (!userId) {
-    throw new Error("Creem webhook missing metadata.userId");
+    throw new Error("Creem webhook missing user identity");
   }
 
-  const productId = getProductId(subscription) ?? getProductId(object);
-  const customerId = getCustomerId(subscription) ?? getCustomerId(object);
-  const subscriptionId = subscription.id ?? null;
+  if (eventType === "checkout.completed" && !subscriptionId) {
+    if (customerId) {
+      const { error } = await admin
+        .from("users")
+        .update({ creem_customer_id: customerId })
+        .eq("id", userId);
+
+      if (error) throw error;
+    }
+
+    return {
+      synced: false,
+      reason: "checkout_completed_without_subscription",
+      userId,
+      subscriptionId,
+    };
+  }
+
+  if (!subscription) {
+    return {
+      synced: false,
+      reason: "event_without_subscription",
+      userId,
+      subscriptionId,
+    };
+  }
+
   const currentPeriodEndIso = subscription.current_period_end_date
     ? new Date(subscription.current_period_end_date).toISOString()
     : null;
 
-  const admin = createAdminSupabaseClient();
   const { data: existingProfile, error: profileError } = await admin
     .from("users")
     .select("subscription_end")
@@ -315,4 +417,11 @@ export async function syncCreemWebhookEvent(event: CreemWebhookEvent) {
   if (error) {
     throw error;
   }
+
+  return {
+    synced: true,
+    userId,
+    subscriptionId,
+    status: nextStatus,
+  };
 }
