@@ -130,7 +130,7 @@ export type LibraryResponse = {
 
 export type SubscriptionStatus = 'active' | 'inactive' | 'past_due' | 'canceled'
 
-export type SubscriptionPlan = 'monthly' | 'yearly' | null
+export type SubscriptionPlan = 'basic' | 'plus' | 'pro' | 'monthly' | 'yearly' | null
 
 export type UserSubscription = {
   status: SubscriptionStatus
@@ -145,7 +145,7 @@ export type UserSubscription = {
 // Response: ApiResponse<UserSubscription>
 
 // POST /api/subscription/checkout
-// Body: { plan: 'monthly' | 'yearly'; returnUrl: string }
+// Body: { plan: 'basic' | 'plus' | 'pro'; returnUrl: string }
 // Response: ApiResponse<{ checkoutUrl: string }>
 
 // POST /api/subscription/portal

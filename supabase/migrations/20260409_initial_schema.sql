@@ -7,7 +7,7 @@ create table if not exists public.users (
   subscription_status text not null default 'inactive' check (
     subscription_status in ('active', 'inactive', 'past_due', 'canceled')
   ),
-  subscription_plan text check (subscription_plan in ('monthly', 'yearly')),
+  subscription_plan text check (subscription_plan in ('basic', 'plus', 'pro', 'monthly', 'yearly')),
   subscription_end timestamptz,
   generation_credits_used integer not null default 0,
   voice_clone_credits_used integer not null default 0,

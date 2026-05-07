@@ -67,6 +67,8 @@ export function getCreemBaseUrl() {
 
 function getCreemEnv() {
   const mode = getCreemMode();
+  const legacyMonthlyProductId = getOptionalEnv("CREEM_MONTHLY_PRODUCT_ID");
+  const legacyYearlyProductId = getOptionalEnv("CREEM_YEARLY_PRODUCT_ID");
   return {
     apiKey:
       mode === "live"
@@ -77,21 +79,25 @@ function getCreemEnv() {
         ? getOptionalEnv("CREEM_LIVE_WEBHOOK_SECRET") ?? getRequiredEnv("CREEM_WEBHOOK_SECRET")
         : getOptionalEnv("CREEM_TEST_WEBHOOK_SECRET") ?? getRequiredEnv("CREEM_WEBHOOK_SECRET"),
     testProductId: getOptionalEnv("CREEM_TEST_PRODUCT_ID"),
-    monthlyProductId: getOptionalEnv("CREEM_MONTHLY_PRODUCT_ID"),
-    yearlyProductId: getOptionalEnv("CREEM_YEARLY_PRODUCT_ID"),
+    basicProductId: getOptionalEnv("CREEM_BASIC_PRODUCT_ID"),
+    plusProductId: getOptionalEnv("CREEM_PLUS_PRODUCT_ID") ?? legacyMonthlyProductId,
+    proProductId: getOptionalEnv("CREEM_PRO_PRODUCT_ID"),
+    monthlyProductId: legacyMonthlyProductId,
+    yearlyProductId: legacyYearlyProductId,
   };
 }
 
 export function getAvailableCreemPlans(): Array<Exclude<SubscriptionPlan, null>> {
-  const { monthlyProductId, yearlyProductId } = getCreemEnv();
+  const { basicProductId, plusProductId, proProductId } = getCreemEnv();
 
   if (getCreemMode() === "test") {
-    return ["monthly"];
+    return ["basic"];
   }
 
   return [
-    ...(monthlyProductId ? (["monthly"] as const) : []),
-    ...(yearlyProductId ? (["yearly"] as const) : []),
+    ...(basicProductId ? (["basic"] as const) : []),
+    ...(plusProductId ? (["plus"] as const) : []),
+    ...(proProductId ? (["pro"] as const) : []),
   ];
 }
 
@@ -131,7 +137,7 @@ async function creemRequest<T>(
 }
 
 export function getCreemProductId(plan: Exclude<SubscriptionPlan, null>) {
-  const { testProductId, monthlyProductId, yearlyProductId } = getCreemEnv();
+  const { testProductId, basicProductId, plusProductId, proProductId, monthlyProductId, yearlyProductId } = getCreemEnv();
   if (getCreemMode() === "test") {
     if (!testProductId) {
       throw new Error("Missing required environment variable: CREEM_TEST_PRODUCT_ID");
@@ -139,6 +145,15 @@ export function getCreemProductId(plan: Exclude<SubscriptionPlan, null>) {
     return testProductId;
   }
 
+  if (plan === "basic" && !basicProductId) {
+    throw new Error("Missing required environment variable: CREEM_BASIC_PRODUCT_ID");
+  }
+  if (plan === "plus" && !plusProductId) {
+    throw new Error("Missing required environment variable: CREEM_PLUS_PRODUCT_ID");
+  }
+  if (plan === "pro" && !proProductId) {
+    throw new Error("Missing required environment variable: CREEM_PRO_PRODUCT_ID");
+  }
   if (plan === "monthly" && !monthlyProductId) {
     throw new Error("Missing required environment variable: CREEM_MONTHLY_PRODUCT_ID");
   }
@@ -146,15 +161,29 @@ export function getCreemProductId(plan: Exclude<SubscriptionPlan, null>) {
     throw new Error("Missing required environment variable: CREEM_YEARLY_PRODUCT_ID");
   }
 
-  return plan === "monthly" ? monthlyProductId! : yearlyProductId!;
+  switch (plan) {
+    case "basic":
+      return basicProductId!;
+    case "plus":
+      return plusProductId!;
+    case "pro":
+      return proProductId!;
+    case "monthly":
+      return monthlyProductId!;
+    case "yearly":
+      return yearlyProductId!;
+  }
 }
 
 export function getPlanFromCreemProductId(productId: string | null | undefined): SubscriptionPlan {
-  const { testProductId, monthlyProductId, yearlyProductId } = getCreemEnv();
+  const { testProductId, basicProductId, plusProductId, proProductId, monthlyProductId, yearlyProductId } = getCreemEnv();
   if (!productId) return null;
   if (getCreemMode() === "test" && testProductId && productId === testProductId) {
-    return "monthly";
+    return "basic";
   }
+  if (basicProductId && productId === basicProductId) return "basic";
+  if (plusProductId && productId === plusProductId) return "plus";
+  if (proProductId && productId === proProductId) return "pro";
   if (monthlyProductId && productId === monthlyProductId) return "monthly";
   if (yearlyProductId && productId === yearlyProductId) return "yearly";
   return null;

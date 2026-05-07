@@ -17,8 +17,11 @@ export default function PricingPage() {
     <PricingClient
       availablePlans={getAvailableCreemPlans()}
       isTestCheckout={getCreemMode() !== "live"}
-      monthlyPriceUsd={getPriceEnv("NEXT_PUBLIC_MONTHLY_PRICE_USD", 19)}
-      yearlyPriceUsd={getPriceEnv("NEXT_PUBLIC_YEARLY_PRICE_USD", 159)}
+      planPricesUsd={{
+        basic: getPriceEnv("NEXT_PUBLIC_BASIC_PRICE_USD", 9.9),
+        plus: getPriceEnv("NEXT_PUBLIC_PLUS_PRICE_USD", 19.9),
+        pro: getPriceEnv("NEXT_PUBLIC_PRO_PRICE_USD", 29.9),
+      }}
     />
   );
 }

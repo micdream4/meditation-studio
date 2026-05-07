@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function isValidPlan(plan: unknown): plan is Exclude<SubscriptionPlan, null> {
-  return plan === "monthly" || plan === "yearly";
+  return plan === "basic" || plan === "plus" || plan === "pro";
 }
 
 export async function POST(request: NextRequest) {
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   const successUrl = new URL(safeReturnUrl);
   successUrl.searchParams.set("checkout", "success");
 
-  const plan = getCreemMode() === "test" ? "monthly" : body.plan;
+  const plan = getCreemMode() === "test" ? "basic" : body.plan;
 
   if (!isCreemPlanConfigured(plan)) {
     return apiError(

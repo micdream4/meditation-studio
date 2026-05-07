@@ -46,7 +46,7 @@
 
 | PRD 章节 | 关键要求 | 对应任务 | 当前状态 | 说明 |
 |----------|----------|----------|----------|------|
-| 第五章 商业模式与用户权益 | 月付 / 年付订阅 + 生成积分、游客与订阅用户分层 | `BILL-01` `BILL-02` `BILL-03` `BILL-04` | `部分完成` | 订阅链路已切换到 Creem；真实 Creem Product 和 webhook secret 仍需后台配置 |
+| 第五章 商业模式与用户权益 | Basic / Plus / Pro 订阅 + 生成积分、游客与订阅用户分层 | `BILL-01` `BILL-02` `BILL-03` `BILL-04` | `部分完成` | 订阅链路已切换到 Creem；需为三档分别配置真实 Product ID |
 | 第五章 公平使用与成本控制 | 并发、分钟级、日级限制 | `SAFE-02` `GEN-05` | `已完成（基础版）` | 已做并发 1、1 分钟 2 次、1 日 20 次；月度 60 次人工审查未落地 |
 | 第五章 声音克隆规则 | 声音克隆 | `SAFE-05` | `按 PRD 延后` | `voice_profiles` 表已建，但功能未开放，符合 `v1.1` 延期决定 |
 | 第六章 6.2 三种生成模式 | Mood / Template / Custom | `GEN-01` `CREATE-02` `CREATE-03` `CREATE-04` | `已完成` | 三种模式前后端已接通 |
@@ -128,9 +128,10 @@
 
 ### 5.1 P0：上线阻塞
 
-- `BILL-01` 在 Creem 后台创建 Monthly Product、Yearly Product
-  - Monthly Price: `$19/month`, includes 30 generation credits
-  - Yearly Price: `$159/year`, includes 300 generation credits
+- `BILL-01` 在 Creem 后台创建 Basic / Plus / Pro Product
+  - Basic Price: `$9.90/month`, includes 30 generation credits
+  - Plus Price: `$19.90/month`, includes 75 generation credits
+  - Pro Price: `$29.90/month`, includes 120 generation credits
 - 配置线上环境变量
 - 在 Supabase 开启 Email Auth 和 Google OAuth
 - 配置真实 ElevenLabs voice ID

@@ -332,35 +332,27 @@ export default function HomePage() {
             <p className="text-base mb-10" style={{ color: "var(--color-text-muted)" }}>
               1 credit is roughly 1 minute of generated audio · Cloud library · MP3 downloads · All voices
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <div
-                className="rounded-2xl px-8 py-6 text-center min-w-[160px] transition-all duration-200 hover:shadow-md"
-                style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
-              >
-                <div className="text-4xl font-bold mb-1" style={{ color: "var(--color-text)", fontFamily: "var(--font-display)" }}>
-                  $19
-                </div>
-                <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>30 credits / month</div>
-              </div>
-              <div className="text-xs" style={{ color: "var(--color-text-faint)" }}>or</div>
-              <div
-                className="rounded-2xl px-8 py-6 text-center min-w-[160px] relative transition-all duration-200 hover:shadow-md"
-                style={{
-                  background: "linear-gradient(145deg, rgba(107,143,113,0.1) 0%, var(--color-surface) 100%)",
-                  border: "1px solid rgba(107,143,113,0.22)",
-                }}
-              >
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                ["Basic", "$9.90", "30 credits / month"],
+                ["Plus", "$19.90", "75 credits / month"],
+                ["Pro", "$29.90", "120 credits / month"],
+              ].map(([name, price, credits]) => (
                 <div
-                  className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-xs font-medium"
-                  style={{ background: "var(--color-accent)", color: "#fff" }}
+                  key={name}
+                  className="rounded-2xl px-6 py-6 text-center min-w-[160px] transition-all duration-200 hover:shadow-md"
+                  style={{
+                    background: name === "Plus" ? "linear-gradient(145deg, rgba(107,143,113,0.1) 0%, var(--color-surface) 100%)" : "var(--color-surface)",
+                    border: name === "Plus" ? "1px solid rgba(107,143,113,0.22)" : "1px solid var(--color-border)",
+                  }}
                 >
-                  Better value
+                  <div className="text-xs font-medium mb-2" style={{ color: "var(--color-text-muted)" }}>{name}</div>
+                  <div className="text-4xl font-bold mb-1" style={{ color: "var(--color-text)", fontFamily: "var(--font-display)" }}>
+                    {price}
+                  </div>
+                  <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>{credits}</div>
                 </div>
-                <div className="text-4xl font-bold mb-1" style={{ color: "var(--color-text)", fontFamily: "var(--font-display)" }}>
-                  $159
-                </div>
-                <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>300 credits / year</div>
-              </div>
+              ))}
             </div>
             <div className="mt-8">
               <Link href="/pricing"><Button size="lg">See full pricing</Button></Link>

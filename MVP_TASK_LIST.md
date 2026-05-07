@@ -59,7 +59,7 @@
 建议执行顺序：
 1. 基础工程与环境变量
 2. 认证与用户体系
-3. Stripe 订阅
+3. Creem 订阅
 4. 首页 / 定价 / 登录注册
 5. 生成接口与 `/create`
 6. 播放器与本地缓存
@@ -76,7 +76,7 @@
 |----|--------|------|------|------|
 | INF-01 | P0 | 初始化 Next.js 项目骨架 | App Router、Tailwind、基础目录结构 | 无 |
 | INF-02 | P0 | 配置环境变量模板 | 建立 `.env.example`、区分本地与生产 | INF-01 |
-| INF-03 | P0 | 接入 Supabase / Stripe / OpenRouter / ElevenLabs SDK 或客户端封装 | 抽象服务层，避免页面直接调第三方 | INF-01 |
+| INF-03 | P0 | 接入 Supabase / Creem / OpenRouter / ElevenLabs SDK 或客户端封装 | 抽象服务层，避免页面直接调第三方 | INF-01 |
 | INF-04 | P1 | 建立统一日志与错误处理机制 | API 错误码、前端 toast 文案、服务端日志 | INF-03 |
 | INF-05 | P1 | 建立路由守卫与基础中间件 | 登录态、订阅态、受保护路由拦截 | INF-03 |
 
@@ -120,10 +120,10 @@
 
 | ID | 优先级 | 任务 | 说明 | 依赖 |
 |----|--------|------|------|------|
-| BILL-01 | P0 | 创建 Stripe 产品与 Price | 月付 $19/30 credits；年付 $159/300 credits | INF-02 |
+| BILL-01 | P0 | 创建 Creem 产品 | Basic $9.90/30 credits；Plus $19.90/75 credits；Pro $29.90/120 credits | INF-02 |
 | BILL-02 | P0 | 实现订阅结账入口 | 从 `/pricing` 发起 Checkout | BILL-01, AUTH-01 |
-| BILL-03 | P0 | 实现 Stripe Webhook 同步用户订阅状态 | 更新 `users` 表 | BILL-01, DATA-01 |
-| BILL-04 | P1 | 集成 Stripe Customer Portal | 取消订阅、查看账单 | BILL-01, AUTH-01 |
+| BILL-03 | P0 | 实现 Creem Webhook 同步用户订阅状态 | 更新 `users` 表 | BILL-01, DATA-01 |
+| BILL-04 | P1 | 集成 Creem Customer Portal | 取消订阅、查看账单 | BILL-01, AUTH-01 |
 | BILL-05 | P1 | 实现订阅态校验工具 | 页面访问控制、接口鉴权复用 | BILL-03 |
 
 验收标准：

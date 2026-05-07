@@ -31,7 +31,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-base font-medium mb-3" style={{ color: "var(--color-text)" }}>3. Subscriptions and billing</h2>
-              <p>Access to personalized generation requires a paid subscription. Our current monthly plan is $19/month and includes 30 generation credits each billing period. Subscriptions renew automatically unless canceled. Payments, invoices, taxes, and payment method updates are processed by Creem.</p>
+              <p>Access to personalized generation requires a paid subscription. Current plans are Basic ($9.90/month for 30 generation credits), Plus ($19.90/month for 75 generation credits), and Pro ($29.90/month for 120 generation credits). Subscriptions renew automatically unless canceled. Payments, invoices, taxes, and payment method updates are processed by Creem.</p>
             </section>
 
             <section>

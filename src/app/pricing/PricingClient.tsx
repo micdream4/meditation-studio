@@ -7,11 +7,44 @@ import Footer from "@/components/layout/Footer";
 import Button from "@/components/ui/Button";
 import type { SubscriptionPlan } from "@/types/api";
 
+type PublicPlan = {
+  id: "basic" | "plus" | "pro";
+  name: string;
+  priceUsd: number;
+  credits: number;
+  description: string;
+  highlight?: boolean;
+};
+
+const PLAN_COPY: PublicPlan[] = [
+  {
+    id: "basic",
+    name: "Basic",
+    priceUsd: 9.9,
+    credits: 30,
+    description: "Light personal use, short weekly sessions.",
+  },
+  {
+    id: "plus",
+    name: "Plus",
+    priceUsd: 19.9,
+    credits: 75,
+    description: "Best for a regular meditation routine.",
+    highlight: true,
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    priceUsd: 29.9,
+    credits: 120,
+    description: "More room for longer sessions and re-generations.",
+  },
+];
+
 const FEATURES = [
-  { icon: "◷", label: "Monthly: 30 generation credits" },
-  { icon: "◴", label: "Yearly: 300 generation credits" },
+  { icon: "◷", label: "1 credit = about 1 generated audio minute" },
   { icon: "◈", label: "All 3 creation modes — Mood, Theme, Custom" },
-  { icon: "◎", label: "4–6 professional meditation voices" },
+  { icon: "◎", label: "Meditation-ready AI voices" },
   { icon: "♩", label: "Optional nature background sounds" },
   { icon: "○", label: "Cloud library — save up to 20 sessions" },
   { icon: "↓", label: "MP3 download for every session" },
@@ -25,8 +58,12 @@ const FAQ = [
     a: "Yes. Cancel from your account page. Your access and remaining credits continue until the end of the paid billing period.",
   },
   {
-    q: "Do you offer refunds?",
-    a: "We don't offer refunds for partial months, but you can cancel before your next billing date to avoid future charges.",
+    q: "How do credits work?",
+    a: "One credit roughly equals one minute of generated audio. A 10-minute session uses 10 credits. Re-generating the same script with a different voice also uses credits because it runs TTS again.",
+  },
+  {
+    q: "Which plan should I choose?",
+    a: "Basic is enough for occasional short sessions. Plus is the default choice for a regular routine. Pro is for longer sessions or frequent voice re-generations.",
   },
   {
     q: "What payment methods do you accept?",
@@ -36,42 +73,34 @@ const FAQ = [
     q: "Is there a free trial?",
     a: "No free tier for personalized generation, but you can listen to all 8 curated guided sessions on the homepage to get a feel for the audio quality.",
   },
-  {
-    q: "How do credits work?",
-    a: "One credit roughly equals one minute of generated audio. A 10-minute session uses 10 credits. Re-generating the same script with a different voice also uses credits because it runs TTS again.",
-  },
 ];
 
-type BillingPlan = "monthly" | "yearly";
+function formatPrice(price: number) {
+  return `$${price.toLocaleString("en-US", {
+    minimumFractionDigits: price % 1 === 0 ? 0 : 1,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function getPlanPrice(plan: PublicPlan, prices: Record<PublicPlan["id"], number>) {
+  return prices[plan.id] ?? plan.priceUsd;
+}
 
 export default function PricingClient({
   availablePlans,
   isTestCheckout,
-  monthlyPriceUsd,
-  yearlyPriceUsd,
+  planPricesUsd,
 }: {
   availablePlans: Array<Exclude<SubscriptionPlan, null>>;
   isTestCheckout: boolean;
-  monthlyPriceUsd: number;
-  yearlyPriceUsd: number;
+  planPricesUsd: Record<PublicPlan["id"], number>;
 }) {
-  const yearlyAvailable = availablePlans.includes("yearly");
-  const availableBillingPlans = availablePlans.length > 0 ? availablePlans : (["monthly"] as const);
-  const [billing, setBilling] = useState<BillingPlan>(
-    yearlyAvailable ? "yearly" : availableBillingPlans[0],
-  );
-  const [loading, setLoading] = useState<BillingPlan | null>(null);
+  const [loading, setLoading] = useState<PublicPlan["id"] | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const checkoutPlan: BillingPlan = isTestCheckout ? "monthly" : billing;
-  const monthlyPriceLabel = `$${monthlyPriceUsd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
-  const yearlyPriceLabel = `$${yearlyPriceUsd.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
-  const yearlyMonthlyEquivalent = yearlyPriceUsd / 12;
-  const features = isTestCheckout || !yearlyAvailable
-    ? FEATURES.filter((feature) => !feature.label.startsWith("Yearly:"))
-    : FEATURES;
+  const plusUnavailable = !isTestCheckout && !availablePlans.includes("plus");
 
-  async function handleCheckout(plan: BillingPlan) {
+  async function handleCheckout(plan: PublicPlan["id"]) {
     setLoading(plan);
     setCheckoutError(null);
     try {
@@ -99,8 +128,6 @@ export default function PricingClient({
     <>
       <Navbar />
       <main className="flex-1 pt-16">
-
-        {/* ── Hero ── */}
         <section className="relative overflow-hidden">
           <div
             className="animate-orb pointer-events-none absolute"
@@ -113,7 +140,7 @@ export default function PricingClient({
               background: "radial-gradient(circle, rgba(107,143,113,0.11) 0%, rgba(192,122,90,0.04) 45%, transparent 70%)",
             }}
           />
-          <div className="max-w-3xl mx-auto px-6 pt-24 pb-16 text-center relative">
+          <div className="max-w-3xl mx-auto px-6 pt-24 pb-12 text-center relative">
             <div
               className="animate-fade-up inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium mb-7"
               style={{ background: "var(--color-accent-muted)", color: "var(--color-accent)", border: "1px solid rgba(107,143,113,0.18)" }}
@@ -125,148 +152,152 @@ export default function PricingClient({
               className="animate-fade-up stagger-1 text-5xl md:text-[66px] leading-[1.05] tracking-tight mb-5"
               style={{ fontFamily: "var(--font-display)", color: "var(--color-text)" }}
             >
-              Pay for{" "}
-              <span className="gradient-text">real usage</span>.
+              Choose the rhythm that fits.
             </h1>
             <p
               className="animate-fade-up stagger-2 text-lg leading-relaxed"
               style={{ color: "var(--color-text-muted)" }}
             >
-              AI voice generation has real per-minute cost.
+              Personalized meditation audio priced by real generation usage.
               <br />
-              Credits keep pricing fair without hidden unlimited limits.
+              More credits mean more minutes, longer sessions, and more room to retry voices.
             </p>
           </div>
         </section>
 
-        {/* ── Billing toggle + Cards ── */}
-        <section className="max-w-xl mx-auto px-6 pb-20">
-
-          {!isTestCheckout && yearlyAvailable && (
-            <div className="flex justify-center mb-10">
-              <div
-                className="relative grid grid-cols-2 items-center p-1 rounded-full text-sm w-[320px] max-w-full"
-                style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
-              >
-                <div
-                  className="absolute top-1 bottom-1 rounded-full transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
-                  style={{
-                    background: "linear-gradient(135deg, #78a07e 0%, #5a7a60 100%)",
-                    boxShadow: "0 2px 10px rgba(107,143,113,0.3)",
-                    left: billing === "monthly" ? "4px" : "calc(50% + 2px)",
-                    width: "calc(50% - 6px)",
-                  }}
-                />
-                {availableBillingPlans.map((b) => (
-                  <button
-                    key={b}
-                    onClick={() => setBilling(b)}
-                    className="relative z-10 py-2 rounded-full font-medium transition-colors duration-200 text-center"
-                    style={{ color: billing === b ? "#fff" : "var(--color-text-muted)" }}
-                  >
-                    {b === "monthly" ? "Monthly" : "Yearly"}
-                  </button>
-                ))}
-              </div>
+        <section className="max-w-6xl mx-auto px-6 pb-20">
+          {isTestCheckout && (
+            <div
+              className="max-w-2xl mx-auto mb-8 text-center text-xs px-4 py-3 rounded-2xl"
+              style={{ background: "rgba(192,122,90,0.1)", color: "var(--color-accent-warm)", border: "1px solid rgba(192,122,90,0.16)" }}
+            >
+              Test mode is enabled. Checkout will use the configured Creem test product.
             </div>
           )}
 
-          {/* Price display */}
-          <div className="text-center mb-10">
-            {isTestCheckout && (
-              <div
-                className="inline-block mb-3 text-xs px-3 py-1 rounded-full font-medium"
-                style={{ background: "rgba(192,122,90,0.1)", color: "var(--color-accent-warm)" }}
-              >
-                Test checkout · $1/month
-              </div>
-            )}
-            <div className="flex items-end justify-center gap-2">
-              <span
-                className="text-[76px] leading-none font-bold tracking-tight transition-all duration-300"
-                style={{ fontFamily: "var(--font-display)", color: "var(--color-text)" }}
-              >
-                {isTestCheckout ? "$1" : billing === "monthly" ? monthlyPriceLabel : yearlyPriceLabel}
-              </span>
-              <div className="pb-3 text-left">
-                <div className="text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
-                  {isTestCheckout ? "/month test" : billing === "monthly" ? "/month" : "/year"}
-                </div>
-                {!isTestCheckout && yearlyAvailable && billing === "yearly" && (
-                  <div className="text-xs" style={{ color: "var(--color-text-faint)" }}>
-                    ${yearlyMonthlyEquivalent.toLocaleString("en-US", { maximumFractionDigits: 2 })}/mo equivalent
+          <div className="grid gap-5 md:grid-cols-3">
+            {PLAN_COPY.map((plan) => {
+              const unavailable = !isTestCheckout && !availablePlans.includes(plan.id);
+              const price = getPlanPrice(plan, planPricesUsd);
+              return (
+                <div
+                  key={plan.id}
+                  className="relative rounded-2xl p-6 flex flex-col min-h-[420px]"
+                  style={{
+                    background: "var(--color-surface)",
+                    border: plan.highlight ? "1px solid rgba(107,143,113,0.45)" : "1px solid var(--color-border)",
+                    boxShadow: plan.highlight ? "0 18px 50px rgba(107,143,113,0.14)" : "none",
+                  }}
+                >
+                  {plan.highlight && (
+                    <div
+                      className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs px-3 py-1 rounded-full font-medium"
+                      style={{ background: "var(--color-accent)", color: "#fff" }}
+                    >
+                      Recommended
+                    </div>
+                  )}
+                  <div className="flex items-start justify-between gap-3 mb-5">
+                    <div>
+                      <h2 className="text-xl font-medium" style={{ color: "var(--color-text)" }}>
+                        {plan.name}
+                      </h2>
+                      <p className="text-sm mt-1 min-h-[42px]" style={{ color: "var(--color-text-muted)" }}>
+                        {plan.description}
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-            {!isTestCheckout && yearlyAvailable && billing === "yearly" && (
-              <div
-                className="inline-block mt-2 text-xs px-3 py-1 rounded-full font-medium"
-                style={{ background: "rgba(107,143,113,0.1)", color: "var(--color-accent)" }}
-              >
-                300 credits included each year
-              </div>
-            )}
-            {(isTestCheckout || billing === "monthly") && (
-              <div className="mt-2 text-xs" style={{ color: "var(--color-text-faint)" }}>
-                30 credits included each month
-              </div>
-            )}
+
+                  <div className="mb-6">
+                    <div className="flex items-end gap-1">
+                      <span
+                        className="text-5xl leading-none font-bold tracking-tight"
+                        style={{ fontFamily: "var(--font-display)", color: "var(--color-text)" }}
+                      >
+                        {formatPrice(price)}
+                      </span>
+                      <span className="pb-1 text-sm" style={{ color: "var(--color-text-muted)" }}>
+                        /month
+                      </span>
+                    </div>
+                    <div className="text-sm mt-3" style={{ color: "var(--color-text-muted)" }}>
+                      <span className="font-medium" style={{ color: "var(--color-text)" }}>{plan.credits}</span>{" "}
+                      credits included each month
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl p-4 mb-6" style={{ background: "var(--color-surface-raised)" }}>
+                    <div className="text-xs mb-2" style={{ color: "var(--color-text-faint)" }}>
+                      Typical use
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <div className="font-medium" style={{ color: "var(--color-text)" }}>
+                          {Math.floor(plan.credits / 10)}×
+                        </div>
+                        <div style={{ color: "var(--color-text-muted)" }}>10-min sessions</div>
+                      </div>
+                      <div>
+                        <div className="font-medium" style={{ color: "var(--color-text)" }}>
+                          {Math.floor(plan.credits / 15)}×
+                        </div>
+                        <div style={{ color: "var(--color-text-muted)" }}>15-min sessions</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <ul className="flex flex-col gap-3 mb-6 text-sm" style={{ color: "var(--color-text-muted)" }}>
+                    <li className="flex gap-2">
+                      <span style={{ color: "var(--color-accent)" }}>✓</span>
+                      All generation modes
+                    </li>
+                    <li className="flex gap-2">
+                      <span style={{ color: "var(--color-accent)" }}>✓</span>
+                      AI voice + optional background sound
+                    </li>
+                    <li className="flex gap-2">
+                      <span style={{ color: "var(--color-accent)" }}>✓</span>
+                      Cloud library and MP3 downloads
+                    </li>
+                  </ul>
+
+                  <div className="mt-auto">
+                    <Button
+                      size="lg"
+                      variant={plan.highlight ? "primary" : "secondary"}
+                      loading={loading === plan.id}
+                      disabled={unavailable}
+                      onClick={() => handleCheckout(plan.id)}
+                      className="w-full text-base"
+                    >
+                      {unavailable ? "Coming soon" : `Start ${plan.name}`}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          {/* CTA */}
-          <div className="flex flex-col gap-3">
-            <Button
-              size="lg"
-              loading={loading === checkoutPlan}
-              onClick={() => handleCheckout(checkoutPlan)}
-              className="w-full text-base"
-            >
-              {isTestCheckout
-                ? "Test checkout — $1/month"
-                : billing === "yearly"
-                  ? "Start — 300 credits/year"
-                  : "Start — 30 credits/month"}
-            </Button>
-            {checkoutError && (
-              <p className="text-xs text-center px-3 py-2 rounded-xl" style={{ background: "rgba(192,84,74,0.08)", color: "var(--color-error)", border: "1px solid rgba(192,84,74,0.18)" }}>
-                {checkoutError}
-              </p>
-            )}
-            <div className="flex items-center justify-center gap-5 text-xs" style={{ color: "var(--color-text-faint)" }}>
-              <span className="flex items-center gap-1.5">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Cancel anytime
-              </span>
-              <span className="flex items-center gap-1.5">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <rect x="1.5" y="4" width="9" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
-                  <path d="M4 4V3a2 2 0 114 0v1" stroke="currentColor" strokeWidth="1.2"/>
-                </svg>
-                Secure via Creem
-              </span>
-              <span className="flex items-center gap-1.5">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2"/>
-                  <path d="M6 4v3.5M6 8.5v.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                </svg>
-                No hidden fees
-              </span>
-            </div>
+          {checkoutError && (
+            <p className="max-w-xl mx-auto mt-5 text-xs text-center px-3 py-2 rounded-xl" style={{ background: "rgba(192,84,74,0.08)", color: "var(--color-error)", border: "1px solid rgba(192,84,74,0.18)" }}>
+              {checkoutError}
+            </p>
+          )}
+
+          <div className="flex items-center justify-center gap-5 text-xs mt-6" style={{ color: "var(--color-text-faint)" }}>
+            <span>✓ Cancel anytime</span>
+            <span>▣ Secure via Creem</span>
+            <span>ⓘ No hidden fees</span>
           </div>
 
-          {/* Divider */}
           <div className="my-14 flex items-center gap-4">
             <div className="flex-1 h-px" style={{ background: "var(--color-border)" }} />
-            <span className="text-xs tracking-widest uppercase" style={{ color: "var(--color-text-faint)" }}>Included</span>
+            <span className="text-xs tracking-widest uppercase" style={{ color: "var(--color-text-faint)" }}>Included in every plan</span>
             <div className="flex-1 h-px" style={{ background: "var(--color-border)" }} />
           </div>
 
-          {/* Features */}
-          <ul className="grid grid-cols-1 gap-3">
-            {features.map((f) => (
+          <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {FEATURES.map((f) => (
               <li
                 key={f.label}
                 className="flex items-center gap-4 p-4 rounded-2xl"
@@ -288,7 +319,6 @@ export default function PricingClient({
           </p>
         </section>
 
-        {/* ── FAQ ── */}
         <section className="py-16" style={{ borderTop: "1px solid var(--color-border-subtle)" }}>
           <div className="max-w-2xl mx-auto px-6">
             <h2
@@ -327,7 +357,6 @@ export default function PricingClient({
           </div>
         </section>
 
-        {/* ── Bottom CTA ── */}
         <section className="relative py-24 overflow-hidden">
           <div
             className="animate-orb pointer-events-none absolute"
@@ -345,27 +374,22 @@ export default function PricingClient({
               className="text-3xl md:text-4xl mb-4"
               style={{ fontFamily: "var(--font-display)", color: "var(--color-text)" }}
             >
-              Your first session is<br />one credit choice away.
+              Start with the plan<br />that matches your rhythm.
             </h2>
             <p className="text-sm mb-8" style={{ color: "var(--color-text-muted)" }}>
               Already have an account?{" "}
               <Link href="/login" className="nav-link" style={{ color: "var(--color-accent)" }}>Sign in →</Link>
             </p>
-            <Button size="lg" loading={loading === checkoutPlan} onClick={() => handleCheckout(checkoutPlan)}>
-              {isTestCheckout
-                ? "Test checkout — $1/month"
-                : billing === "yearly"
-                  ? "Start yearly — 300 credits"
-                  : "Start monthly — 30 credits"}
+            <Button
+              size="lg"
+              loading={loading === "plus"}
+              disabled={plusUnavailable}
+              onClick={() => handleCheckout("plus")}
+            >
+              {plusUnavailable ? "Plus coming soon" : "Start Plus — 75 credits"}
             </Button>
-            {checkoutError && (
-              <p className="text-xs text-center mt-3 px-3 py-2 rounded-xl" style={{ background: "rgba(192,84,74,0.08)", color: "var(--color-error)", border: "1px solid rgba(192,84,74,0.18)" }}>
-                {checkoutError}
-              </p>
-            )}
           </div>
         </section>
-
       </main>
       <Footer />
     </>

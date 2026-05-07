@@ -25,6 +25,14 @@ const STATUS_LABELS: Record<string, string> = {
   inactive: "Not subscribed",
 };
 
+const PLAN_LABELS: Record<string, string> = {
+  basic: "Basic",
+  plus: "Plus",
+  pro: "Pro",
+  monthly: "Monthly legacy",
+  yearly: "Yearly legacy",
+};
+
 export default function AccountPage() {
   const [sub, setSub] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,7 +104,7 @@ export default function AccountPage() {
                       <div className="rounded-xl p-4" style={{ background: "var(--color-surface-raised)" }}>
                         <p className="text-xs mb-1" style={{ color: "var(--color-text-faint)" }}>Plan</p>
                         <p className="text-sm font-medium capitalize" style={{ color: "var(--color-text)" }}>
-                          {sub.plan ?? "—"}
+                          {sub.plan ? PLAN_LABELS[sub.plan] ?? sub.plan : "—"}
                         </p>
                       </div>
                       <div className="rounded-xl p-4" style={{ background: "var(--color-surface-raised)" }}>

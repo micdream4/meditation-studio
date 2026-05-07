@@ -8,7 +8,7 @@ export type DbUser = {
   email: string
   display_name: string | null
   subscription_status: 'active' | 'inactive' | 'past_due' | 'canceled'
-  subscription_plan: 'monthly' | 'yearly' | null
+  subscription_plan: 'basic' | 'plus' | 'pro' | 'monthly' | 'yearly' | null
   subscription_end: string | null
   generation_credits_used: number
   voice_clone_credits_used: number

@@ -11,17 +11,25 @@ const requiredEnv = [
   "OPENROUTER_MODEL",
   "ELEVENLABS_API_KEY",
   "ELEVENLABS_MODEL_ID",
-  "CREEM_API_KEY",
-  "CREEM_WEBHOOK_SECRET",
 ] as const;
+
+const requiredCreemCredentialEnv =
+  process.env.CREEM_MODE === "live"
+    ? (process.env.CREEM_LIVE_API_KEY || process.env.CREEM_LIVE_WEBHOOK_SECRET
+        ? (["CREEM_LIVE_API_KEY", "CREEM_LIVE_WEBHOOK_SECRET"] as const)
+        : (["CREEM_API_KEY", "CREEM_WEBHOOK_SECRET"] as const))
+    : (process.env.CREEM_TEST_API_KEY || process.env.CREEM_TEST_WEBHOOK_SECRET
+        ? (["CREEM_TEST_API_KEY", "CREEM_TEST_WEBHOOK_SECRET"] as const)
+        : (["CREEM_API_KEY", "CREEM_WEBHOOK_SECRET"] as const));
 
 const requiredCreemProductEnv =
   process.env.CREEM_MODE === "live"
-    ? (["CREEM_MONTHLY_PRODUCT_ID", "CREEM_YEARLY_PRODUCT_ID"] as const)
+    ? ([] as const)
     : (["CREEM_TEST_PRODUCT_ID"] as const);
 
 const requiredBillingEnv = [
   ...requiredEnv,
+  ...requiredCreemCredentialEnv,
   ...requiredCreemProductEnv,
 ] as const;
 
@@ -33,6 +41,13 @@ const optionalVoiceEnv = [
 ] as const;
 
 const missing = getMissingEnv(requiredBillingEnv);
+if (
+  process.env.CREEM_MODE === "live" &&
+  !process.env.CREEM_PLUS_PRODUCT_ID &&
+  !process.env.CREEM_MONTHLY_PRODUCT_ID
+) {
+  missing.push("CREEM_PLUS_PRODUCT_ID");
+}
 
 if (missing.length > 0) {
   console.error("Missing required environment variables:");

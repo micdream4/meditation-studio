@@ -3,6 +3,9 @@ import type { GenerateRequest, SubscriptionPlan } from "@/types/api";
 import { createAdminSupabaseClient } from "@/lib/supabase";
 
 export const PLAN_GENERATION_CREDITS: Record<Exclude<SubscriptionPlan, null>, number> = {
+  basic: 30,
+  plus: 75,
+  pro: 120,
   monthly: 30,
   yearly: 300,
 };

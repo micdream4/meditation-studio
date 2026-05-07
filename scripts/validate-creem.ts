@@ -13,10 +13,17 @@ const requiredEnv =
 
 const requiredProductEnv =
   process.env.CREEM_MODE === "live"
-    ? (["CREEM_MONTHLY_PRODUCT_ID"] as const)
+    ? ([] as const)
     : (["CREEM_TEST_PRODUCT_ID"] as const);
 
 const missingEnv = getMissingEnv([...requiredEnv, ...requiredProductEnv]);
+if (
+  process.env.CREEM_MODE === "live" &&
+  !process.env.CREEM_PLUS_PRODUCT_ID &&
+  !process.env.CREEM_MONTHLY_PRODUCT_ID
+) {
+  missingEnv.push("CREEM_PLUS_PRODUCT_ID");
+}
 if (missingEnv.length > 0) {
   console.error("Missing required Creem environment variables:");
   for (const key of missingEnv) {

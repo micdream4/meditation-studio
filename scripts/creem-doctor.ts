@@ -105,11 +105,18 @@ async function main() {
   const apiReachable = await checkCreemApiReachable();
   const productEnvKeys =
     process.env.CREEM_MODE === "live"
-      ? (["CREEM_MONTHLY_PRODUCT_ID"] as const)
+      ? ([] as const)
       : (["CREEM_TEST_PRODUCT_ID"] as const);
   const credentialEnvKeys = getCreemCredentialKeys();
   const requiredEnvKeys = [...credentialEnvKeys, ...productEnvKeys] as const;
   const missing = getMissingEnv(requiredEnvKeys);
+  if (
+    process.env.CREEM_MODE === "live" &&
+    !process.env.CREEM_PLUS_PRODUCT_ID &&
+    !process.env.CREEM_MONTHLY_PRODUCT_ID
+  ) {
+    missing.push("CREEM_PLUS_PRODUCT_ID");
+  }
 
   for (const key of requiredEnvKeys) {
     if (missing.includes(key)) {
@@ -129,15 +136,22 @@ async function main() {
   }
 
   let productsOk = false;
-  if (process.env.CREEM_MODE === "live" && process.env.CREEM_MONTHLY_PRODUCT_ID) {
-    const monthlyOk = await checkProduct(process.env.CREEM_MONTHLY_PRODUCT_ID, "Monthly");
-    const yearlyOk = process.env.CREEM_YEARLY_PRODUCT_ID
-      ? await checkProduct(process.env.CREEM_YEARLY_PRODUCT_ID, "Yearly")
+  const plusProductId = process.env.CREEM_PLUS_PRODUCT_ID || process.env.CREEM_MONTHLY_PRODUCT_ID;
+  if (process.env.CREEM_MODE === "live" && plusProductId) {
+    const basicOk = process.env.CREEM_BASIC_PRODUCT_ID
+      ? await checkProduct(process.env.CREEM_BASIC_PRODUCT_ID, "Basic")
       : true;
-    if (!process.env.CREEM_YEARLY_PRODUCT_ID) {
-      printCheck("warn", "Yearly Product", "not configured; yearly checkout will stay hidden");
+    const plusOk = await checkProduct(plusProductId, "Plus");
+    const proOk = process.env.CREEM_PRO_PRODUCT_ID
+      ? await checkProduct(process.env.CREEM_PRO_PRODUCT_ID, "Pro")
+      : true;
+    if (!process.env.CREEM_BASIC_PRODUCT_ID) {
+      printCheck("warn", "Basic Product", "not configured; basic checkout will stay disabled");
     }
-    productsOk = monthlyOk && yearlyOk;
+    if (!process.env.CREEM_PRO_PRODUCT_ID) {
+      printCheck("warn", "Pro Product", "not configured; pro checkout will stay disabled");
+    }
+    productsOk = basicOk && plusOk && proOk;
   } else if (process.env.CREEM_MODE !== "live" && process.env.CREEM_TEST_PRODUCT_ID) {
     productsOk = await checkProduct(process.env.CREEM_TEST_PRODUCT_ID, "Test $1");
   } else {
