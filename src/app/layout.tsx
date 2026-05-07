@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.meditationstudio.live";
+
 const inter = localFont({
   variable: "--font-inter",
   display: "swap",
@@ -42,13 +44,35 @@ const dmSerifDisplay = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Meditation Studio — AI-Guided Meditation",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Meditation Studio — AI-Guided Meditation",
+    template: "%s — Meditation Studio",
+  },
   description:
     "Tell us how you feel. We'll create a personalized meditation just for you — voiced, scored, and ready in seconds.",
+  keywords: [
+    "AI meditation",
+    "guided meditation",
+    "personalized meditation",
+    "meditation audio",
+    "sleep meditation",
+    "anxiety meditation",
+  ],
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     title: "Meditation Studio",
     description: "AI-generated meditation, tailored to your moment.",
+    url: siteUrl,
+    siteName: "Meditation Studio",
     type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Meditation Studio",
+    description: "AI-generated meditation, tailored to your moment.",
   },
 };
 

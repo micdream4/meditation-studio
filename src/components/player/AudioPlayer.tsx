@@ -639,7 +639,7 @@ export default function AudioPlayer({ ttsUrl, musicUrl, title, onSave, onDownloa
                 border: "1px solid var(--color-border)",
               }}
             >
-              Download MP3
+              Download audio
             </button>
           )}
         </div>

@@ -48,5 +48,8 @@ export async function GET(
     speechStoragePath: getGeneratedAudioPath(user.id, generation.id),
     musicTrackId,
     exportStoragePath: getGeneratedExportPath(user.id, generation.id, musicTrackId),
+    filename: `meditation-${generation.duration_minutes ?? "session"}min.${
+      musicTrackId === "none" ? "mp3" : "wav"
+    }`,
   });
 }

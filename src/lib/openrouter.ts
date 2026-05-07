@@ -71,15 +71,15 @@ function shouldRetryWithFallback(error: unknown) {
 function getTargetWordCount(durationMinutes: number) {
   switch (durationMinutes) {
     case 1:
-      return "90-110 spoken words";
+      return "70-90 spoken words";
     case 5:
-      return "420-560 spoken words";
+      return "330-440 spoken words";
     case 10:
-      return "850-1,050 spoken words";
+      return "650-850 spoken words";
     case 15:
-      return "1,250-1,550 spoken words";
+      return "980-1,250 spoken words";
     case 20:
-      return "1,650-2,050 spoken words";
+      return "1,300-1,600 spoken words";
     default:
       return "a sparse spoken word count appropriate for the requested duration";
   }
@@ -89,8 +89,8 @@ function buildPacingInstructions(durationMinutes: number) {
   return [
     `Target length: ${durationMinutes} minutes.`,
     `Target density: ${getTargetWordCount(durationMinutes)} because the final TTS will be spoken slowly.`,
-    "Write for guided audio, not reading: short lines, simple sentences, spacious pacing.",
-    "Use [pause] as a standalone line after most breath or body-awareness instructions.",
+    "Write for guided audio, not reading: short lines, simple sentences, spacious pacing, and one idea per line.",
+    "Use [pause] as a standalone line after most breath or body-awareness instructions and every 2-4 sentences.",
     "Do not pack the script with continuous prose; silence is part of the meditation.",
   ].join("\n");
 }
@@ -168,7 +168,7 @@ export async function generateMeditationScript(input: GenerateRequest["input"]) 
           {
             role: "system",
             content:
-              "You are a meditation writer for slow spoken audio. Produce a calm, grounded English meditation script. Use second person, avoid medical advice, avoid diagnosis, avoid religious specificity, and keep the tone gentle and unforced. Favor sparse wording, breath-length phrases, and meaningful silence. Use [pause] markers only as timing instructions; never explain them.",
+              "You are a meditation writer for slow, studio-style spoken audio. Produce a calm, grounded English meditation script that sounds like a human teacher with warmth, restraint, and spacious timing. Use second person, avoid medical advice, avoid diagnosis, avoid religious specificity, and keep the tone gentle and unforced. Favor sparse wording, breath-length phrases, and meaningful silence. Use [pause] markers only as timing instructions; never explain them.",
           },
           {
             role: "user",

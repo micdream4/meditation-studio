@@ -4,11 +4,13 @@ import { NextResponse } from "next/server";
 
 import { mixMeditationAudioToWav } from "@/lib/audio-export";
 import { createAdminSupabaseClient } from "@/lib/supabase";
-import {
-  AUDIO_BUCKET,
-  getStorageUrl,
-} from "@/lib/storage";
+import { AUDIO_BUCKET } from "@/lib/storage";
 import { getMusicTrack } from "@/lib/music";
+
+type DownloadPayload = {
+  bytes: Buffer;
+  contentType: string;
+};
 
 function getPublicMusicAssetPath(url: string) {
   if (!url.startsWith("/music/") || url.includes("..")) {
@@ -31,6 +33,27 @@ async function downloadStorageBytes(storagePath: string) {
   return new Uint8Array(await data.arrayBuffer());
 }
 
+function buildAttachmentResponse(
+  payload: DownloadPayload,
+  filename: string,
+) {
+  const safeFilename = filename
+    .replace(/[/\\?%*:|"<>]/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 120) || "meditation-audio";
+
+  return new NextResponse(new Uint8Array(payload.bytes), {
+    headers: {
+      "Content-Type": payload.contentType,
+      "Content-Length": String(payload.bytes.byteLength),
+      "Content-Disposition": `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`,
+      "Cache-Control": "private, max-age=0, must-revalidate",
+    },
+  });
+}
+
 async function storageObjectExists(storagePath: string) {
   const admin = createAdminSupabaseClient();
   const folder = path.posix.dirname(storagePath);
@@ -49,19 +72,45 @@ export async function createAudioDownloadRedirect({
   speechStoragePath,
   musicTrackId,
   exportStoragePath,
+  filename,
 }: {
   speechStoragePath: string;
   musicTrackId: string;
   exportStoragePath: string;
+  filename: string;
 }) {
+  const payload = await createAudioDownloadPayload({
+    speechStoragePath,
+    musicTrackId,
+    exportStoragePath,
+  });
+
+  return buildAttachmentResponse(payload, filename);
+}
+
+export async function createAudioDownloadPayload({
+  speechStoragePath,
+  musicTrackId,
+  exportStoragePath,
+}: {
+  speechStoragePath: string;
+  musicTrackId: string;
+  exportStoragePath: string;
+}): Promise<DownloadPayload> {
   const musicTrack = getMusicTrack(musicTrackId);
 
   if (!musicTrack.url && !musicTrack.exportUrl) {
-    return NextResponse.redirect(getStorageUrl(speechStoragePath), 303);
+    return {
+      bytes: Buffer.from(await downloadStorageBytes(speechStoragePath)),
+      contentType: "audio/mpeg",
+    };
   }
 
   if (await storageObjectExists(exportStoragePath)) {
-    return NextResponse.redirect(getStorageUrl(exportStoragePath), 303);
+    return {
+      bytes: Buffer.from(await downloadStorageBytes(exportStoragePath)),
+      contentType: "audio/wav",
+    };
   }
 
   const [speechBytes, musicBytes] = await Promise.all([
@@ -84,5 +133,8 @@ export async function createAudioDownloadRedirect({
     throw error;
   }
 
-  return NextResponse.redirect(getStorageUrl(exportStoragePath), 303);
+  return {
+    bytes: Buffer.from(wavBuffer),
+    contentType: "audio/wav",
+  };
 }

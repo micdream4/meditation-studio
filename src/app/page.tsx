@@ -52,7 +52,7 @@ const FAQ = [
   },
   {
     q: "Can I download my sessions?",
-    a: "Yes — every generated session can be saved to your library and downloaded as an MP3.",
+    a: "Yes — every generated session can be saved to your library and downloaded as an audio file. Sessions with background music export as a mixed file.",
   },
 ];
 
@@ -330,7 +330,7 @@ export default function HomePage() {
               Credit-based pricing, no hidden limits.
             </h2>
             <p className="text-base mb-10" style={{ color: "var(--color-text-muted)" }}>
-              1 credit is roughly 1 minute of generated audio · Cloud library · MP3 downloads · All voices
+              1 credit is roughly 1 minute of generated audio · Cloud library · Audio downloads · All voices
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[

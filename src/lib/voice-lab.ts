@@ -22,11 +22,11 @@ export const VOICE_LAB_PRESETS: Array<{
     label: "Meditation default",
     description: "Current slow production setting",
     settings: {
-      stability: 0.48,
-      similarity_boost: 0.72,
-      style: 0.28,
+      stability: 0.42,
+      similarity_boost: 0.7,
+      style: 0.36,
       use_speaker_boost: true,
-      speed: 0.7,
+      speed: 0.64,
     },
   },
   {
@@ -34,11 +34,11 @@ export const VOICE_LAB_PRESETS: Array<{
     label: "More expressive",
     description: "Less stable, more emotional movement",
     settings: {
-      stability: 0.34,
-      similarity_boost: 0.66,
-      style: 0.46,
+      stability: 0.3,
+      similarity_boost: 0.64,
+      style: 0.55,
       use_speaker_boost: true,
-      speed: 0.7,
+      speed: 0.64,
     },
   },
   {
@@ -46,11 +46,11 @@ export const VOICE_LAB_PRESETS: Array<{
     label: "Steady narrator",
     description: "Smoother and less theatrical",
     settings: {
-      stability: 0.62,
-      similarity_boost: 0.78,
-      style: 0.18,
+      stability: 0.58,
+      similarity_boost: 0.76,
+      style: 0.22,
       use_speaker_boost: true,
-      speed: 0.74,
+      speed: 0.68,
     },
   },
 ];

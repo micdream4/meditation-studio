@@ -56,5 +56,8 @@ export async function GET(
     speechStoragePath: track.storage_path,
     musicTrackId,
     exportStoragePath: getSavedTrackExportPath(user.id, track.id, musicTrackId),
+    filename: `${track.title ?? "meditation-audio"}.${
+      musicTrackId === "none" ? "mp3" : "wav"
+    }`,
   });
 }

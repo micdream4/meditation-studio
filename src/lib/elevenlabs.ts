@@ -291,16 +291,16 @@ export function splitTextIntoChunks(text: string, maxLength = 800) {
 function normalizePauseMarkers(text: string): string {
   // ElevenLabs does not use SSML here, so punctuation is the safest portable pause cue.
   return text
-    .replace(/\s*\[pause\]\s*/gi, " ... ... ... ")
-    .replace(/([.!?])\s+(?=[A-Z])/g, "$1 ... ")
+    .replace(/\s*\[pause\]\s*/gi, " ... ... ... ... ")
+    .replace(/([.!?])\s+(?=[A-Z])/g, "$1 ... ... ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function getMeditationSpeed(speechRate?: "slow" | "normal" | "fast") {
-  if (speechRate === "fast") return 0.88;
-  if (speechRate === "normal") return 0.78;
-  return 0.7;
+  if (speechRate === "fast") return 0.82;
+  if (speechRate === "normal") return 0.72;
+  return 0.64;
 }
 
 function getMeditationVoiceSettings(speechRate?: "slow" | "normal" | "fast"): VoiceLabSettings {
@@ -343,10 +343,10 @@ export async function synthesizeVoicePreview(voiceId: string) {
     output_format: "mp3_44100_128",
     voice_settings: {
       stability: 0.5,
-      similarity_boost: 0.72,
-      style: 0.25,
+      similarity_boost: 0.7,
+      style: 0.35,
       use_speaker_boost: true,
-      speed: 0.76,
+      speed: 0.68,
     },
   });
 

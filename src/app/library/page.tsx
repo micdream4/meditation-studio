@@ -5,6 +5,7 @@ import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import AudioPlayer from "@/components/player/AudioPlayer";
 import Button from "@/components/ui/Button";
+import { trackEvent } from "@/lib/analytics";
 import { downloadAudioFile } from "@/lib/download";
 import { getMusicTrack } from "@/lib/music";
 import type { SavedTrack } from "@/types/api";
@@ -44,6 +45,7 @@ export default function LibraryPage() {
       const json = await res.json();
       if (json.success) {
         setTracks((prev) => prev.filter((t) => t.id !== id));
+        trackEvent("library.track_deleted", { trackId: id });
       }
     } catch { /* ignore */ }
     finally {
@@ -61,6 +63,11 @@ export default function LibraryPage() {
 
     try {
       await downloadAudioFile(downloadUrl, `${track.title}.${extension}`);
+      trackEvent("library.track_downloaded", {
+        trackId: track.id,
+        hasMusic,
+        extension,
+      });
     } catch {
       window.location.href = downloadUrl;
     }

@@ -12,11 +12,23 @@ import {
   getInitialMusicTrackId,
   getMusicTrack,
 } from "@/lib/music";
+import { trackEvent } from "@/lib/analytics";
 import { downloadAudioFile } from "@/lib/download";
-import type { GenerationDurationMinutes, GenerateRequest, GenerateResponse, Voice } from "@/types/api";
+import type {
+  ApiError,
+  GenerationDurationMinutes,
+  GenerateRequest,
+  GenerateResponse,
+  UserSubscription,
+  Voice,
+} from "@/types/api";
 
 type Mode = "mood" | "template" | "custom";
 type GenStatus = "idle" | "script" | "voice" | "ready" | "failed";
+type SubscriptionSummary = Pick<
+  UserSubscription,
+  "status" | "plan" | "generationCreditsIncluded" | "generationCreditsRemaining"
+>;
 
 const MOODS = [
   { value: "anxious", label: "Anxious" },
@@ -48,6 +60,25 @@ const STATUS_LABELS: Record<GenStatus, string> = {
   ready: "Your session is ready",
   failed: "Something went wrong",
 };
+
+function getFriendlyApiError(error?: ApiError) {
+  if (!error) return "Something went wrong. Please try again.";
+
+  switch (error.code) {
+    case "subscription_required":
+      return "You need an active subscription before generating a new session.";
+    case "generation_credits_exhausted":
+      return "You do not have enough generation credits for this session. Choose a shorter duration or update your plan.";
+    case "generation_in_progress":
+      return "Another session is still being generated. Wait a moment, then try again.";
+    case "unauthorized":
+      return "Please sign in again before continuing.";
+    case "rate_limited":
+      return "Too many requests at once. Wait a moment, then try again.";
+    default:
+      return error.message;
+  }
+}
 
 type ThemeValue = (typeof THEMES)[number]["value"];
 
@@ -155,9 +186,12 @@ function CreatePageInner() {
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [showScript, setShowScript] = useState(false);
+  const [subscriptionSummary, setSubscriptionSummary] = useState<SubscriptionSummary | null>(null);
   const generatedMusicTrack = getMusicTrack(audioMusicTrackId);
   const selectedVoice = voices.find((voice) => voice.id === voiceId);
   const selectedMusicTrack = getMusicTrack(musicTrackId);
+  const remainingCredits = subscriptionSummary?.generationCreditsRemaining;
+  const hasEnoughCredits = remainingCredits === undefined || remainingCredits >= duration;
 
   // Load voices
   useEffect(() => {
@@ -190,6 +224,27 @@ function CreatePageInner() {
       voicePreviewRef.current?.pause();
       musicPreviewRef.current?.pause();
     };
+  }, []);
+
+  async function refreshSubscriptionSummary() {
+    try {
+      const res = await fetch("/api/subscription", { cache: "no-store" });
+      const json: { success: boolean; data?: UserSubscription } = await res.json();
+      if (json.success && json.data) {
+        setSubscriptionSummary({
+          status: json.data.status,
+          plan: json.data.plan,
+          generationCreditsIncluded: json.data.generationCreditsIncluded,
+          generationCreditsRemaining: json.data.generationCreditsRemaining,
+        });
+      }
+    } catch {
+      // Credit details are helpful but should never block generation UI.
+    }
+  }
+
+  useEffect(() => {
+    refreshSubscriptionSummary();
   }, []);
 
   function handleVoicePreview(voice: Voice) {
@@ -327,6 +382,12 @@ function CreatePageInner() {
           setAudioVoiceId(expectedVoiceId);
           setAudioMusicTrackId(expectedMusicTrackId);
           setStatus("ready");
+          trackEvent("generation.audio_ready", {
+            duration,
+            voiceId: expectedVoiceId,
+            musicTrackId: expectedMusicTrackId,
+          });
+          void refreshSubscriptionSummary();
         } else if (s2 === "failed") {
           if (pollRef.current) {
             clearInterval(pollRef.current);
@@ -360,6 +421,12 @@ function CreatePageInner() {
     const inputSignature = getInputSignature(input);
     const requestedVoiceId = voiceId || "default";
     const body: GenerateRequest = { input, voiceId: requestedVoiceId, musicTrackId };
+    trackEvent("generation.started", {
+      mode,
+      duration,
+      voiceId: requestedVoiceId,
+      musicTrackId,
+    });
 
     try {
       const res = await fetch("/api/generate", {
@@ -367,11 +434,16 @@ function CreatePageInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const json: { success: boolean; data?: GenerateResponse; error?: { message: string } } = await res.json();
+      const json: { success: boolean; data?: GenerateResponse; error?: ApiError } = await res.json();
 
       if (!json.success || !json.data) {
         setStatus("failed");
-        setErrorMsg(json.error?.message ?? "Generation failed. Please try again.");
+        setErrorMsg(getFriendlyApiError(json.error));
+        trackEvent("generation.failed", {
+          mode,
+          duration,
+          code: json.error?.code ?? "unknown",
+        });
         return;
       }
 
@@ -384,6 +456,11 @@ function CreatePageInner() {
       if (s === "failed") {
         setStatus("failed");
         setErrorMsg(script ?? json.data.errorCode ?? "Generation failed. Please try again.");
+        trackEvent("generation.failed", {
+          mode,
+          duration,
+          code: json.data.errorCode ?? "generation_failed",
+        });
         return;
       }
 
@@ -392,6 +469,12 @@ function CreatePageInner() {
         setAudioVoiceId(requestedVoiceId);
         setAudioMusicTrackId(musicTrackId);
         setStatus("ready");
+        trackEvent("generation.audio_ready", {
+          duration,
+          voiceId: requestedVoiceId,
+          musicTrackId,
+        });
+        void refreshSubscriptionSummary();
         return;
       }
 
@@ -400,6 +483,7 @@ function CreatePageInner() {
     } catch {
       setStatus("failed");
       setErrorMsg("Network error. Please check your connection and try again.");
+      trackEvent("generation.failed", { mode, duration, code: "network" });
     }
   }
 
@@ -416,6 +500,11 @@ function CreatePageInner() {
     setAudioMusicTrackId(null);
     setSavedMsg(null);
     setErrorMsg(null);
+    trackEvent("generation.voice_regeneration_started", {
+      duration,
+      voiceId: requestedVoiceId,
+      musicTrackId,
+    });
 
     try {
       const res = await fetch(`/api/generate/${generationId}/voice`, {
@@ -423,11 +512,15 @@ function CreatePageInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ voiceId: requestedVoiceId, musicTrackId }),
       });
-      const json: { success: boolean; data?: GenerateResponse; error?: { message: string } } = await res.json();
+      const json: { success: boolean; data?: GenerateResponse; error?: ApiError } = await res.json();
 
       if (!json.success || !json.data) {
         setStatus("failed");
-        setErrorMsg(json.error?.message ?? "Voice regeneration failed. Please try again.");
+        setErrorMsg(getFriendlyApiError(json.error));
+        trackEvent("generation.voice_regeneration_failed", {
+          duration,
+          code: json.error?.code ?? "unknown",
+        });
         return;
       }
 
@@ -440,6 +533,7 @@ function CreatePageInner() {
     } catch {
       setStatus("failed");
       setErrorMsg("Network error. Please check your connection and try again.");
+      trackEvent("generation.voice_regeneration_failed", { duration, code: "network" });
     }
   }
 
@@ -455,8 +549,13 @@ function CreatePageInner() {
       const json = await res.json();
       if (json.success) setSavedMsg("Saved to your library.");
       else setSavedMsg(json.error?.message ?? "Could not save.");
+      trackEvent(json.success ? "generation.saved" : "generation.save_failed", {
+        duration,
+        musicTrackId: audioMusicTrackId ?? "none",
+      });
     } catch {
       setSavedMsg("Could not save.");
+      trackEvent("generation.save_failed", { duration, code: "network" });
     } finally {
       setSaving(false);
     }
@@ -472,6 +571,11 @@ function CreatePageInner() {
 
     try {
       await downloadAudioFile(downloadUrl, `meditation-${duration}min.${extension}`);
+      trackEvent("generation.downloaded", {
+        duration,
+        hasMusic,
+        extension,
+      });
     } catch {
       window.location.href = downloadUrl;
     }
@@ -651,8 +755,11 @@ function CreatePageInner() {
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div>
                     <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>Duration</p>
-                    <p className="text-xs mt-1" style={{ color: "var(--color-text-faint)" }}>
-                      This session uses {duration} credits.
+                    <p className="text-xs mt-1" style={{ color: hasEnoughCredits ? "var(--color-text-faint)" : "var(--color-error)" }}>
+                      This session uses {duration} credits
+                      {remainingCredits !== undefined
+                        ? ` · ${remainingCredits} remaining`
+                        : "."}
                     </p>
                   </div>
                 </div>
@@ -807,13 +914,15 @@ function CreatePageInner() {
               size="lg"
               className="w-full"
               loading={status === "script" || status === "voice"}
-              disabled={!canGenerate || (mode === "custom" && customText.trim().length < 20)}
+              disabled={!canGenerate || !hasEnoughCredits || (mode === "custom" && customText.trim().length < 20)}
               onClick={canRegenerateVoice ? handleRegenerateVoice : handleGenerate}
             >
               {status === "script" || status === "voice"
                 ? STATUS_LABELS[status]
                 : canRegenerateVoice
                   ? "Regenerate voice with selected voice"
+                  : !hasEnoughCredits
+                    ? "Not enough credits"
                   : "Generate meditation"}
             </Button>
 
@@ -865,6 +974,11 @@ function CreatePageInner() {
                       onDownload={handleDownload}
                       saving={saving}
                     />
+                    {subscriptionSummary && (
+                      <p className="text-xs text-center" style={{ color: "var(--color-text-faint)" }}>
+                        {duration} credits used · {subscriptionSummary.generationCreditsRemaining} of {subscriptionSummary.generationCreditsIncluded} credits remaining this period.
+                      </p>
+                    )}
                     {savedMsg && (
                       <p className="text-xs text-center" style={{ color: savedMsg.includes("Saved") ? "var(--color-success)" : "var(--color-error)" }}>
                         {savedMsg}

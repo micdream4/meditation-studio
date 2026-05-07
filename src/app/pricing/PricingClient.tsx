@@ -5,6 +5,7 @@ import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import Button from "@/components/ui/Button";
+import { trackEvent } from "@/lib/analytics";
 import type { SubscriptionPlan } from "@/types/api";
 
 type PublicPlan = {
@@ -47,7 +48,7 @@ const FEATURES = [
   { icon: "◎", label: "Meditation-ready AI voices" },
   { icon: "♩", label: "Optional nature background sounds" },
   { icon: "○", label: "Cloud library — save up to 20 sessions" },
-  { icon: "↓", label: "MP3 download for every session" },
+  { icon: "↓", label: "Audio download for every session" },
   { icon: "▷", label: "Access to 8 curated guided sessions" },
   { icon: "×", label: "Cancel anytime — no forms, no emails" },
 ];
@@ -77,7 +78,7 @@ const FAQ = [
 
 function formatPrice(price: number) {
   return `$${price.toLocaleString("en-US", {
-    minimumFractionDigits: price % 1 === 0 ? 0 : 1,
+    minimumFractionDigits: price % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 2,
   })}`;
 }
@@ -103,6 +104,7 @@ export default function PricingClient({
   async function handleCheckout(plan: PublicPlan["id"]) {
     setLoading(plan);
     setCheckoutError(null);
+    trackEvent("pricing.checkout_started", { plan, testMode: isTestCheckout });
     try {
       const res = await fetch("/api/subscription/checkout", {
         method: "POST",
@@ -111,13 +113,21 @@ export default function PricingClient({
       });
       const json = await res.json();
       if (json.success) {
+        trackEvent("pricing.checkout_redirected", { plan, testMode: isTestCheckout });
         window.location.href = json.data.checkoutUrl;
       } else if (json.error?.code === "unauthorized") {
+        trackEvent("pricing.checkout_auth_required", { plan, testMode: isTestCheckout });
         window.location.href = `/signup?plan=${plan}`;
       } else {
+        trackEvent("pricing.checkout_failed", {
+          plan,
+          testMode: isTestCheckout,
+          code: json.error?.code ?? "unknown",
+        });
         setCheckoutError(json.error?.message ?? "Checkout is unavailable right now.");
       }
     } catch {
+      trackEvent("pricing.checkout_failed", { plan, testMode: isTestCheckout, code: "network" });
       setCheckoutError("Checkout is unavailable right now. Please try again later.");
     } finally {
       setLoading(null);
@@ -257,7 +267,7 @@ export default function PricingClient({
                     </li>
                     <li className="flex gap-2">
                       <span style={{ color: "var(--color-accent)" }}>✓</span>
-                      Cloud library and MP3 downloads
+                      Cloud library and audio downloads
                     </li>
                   </ul>
 
