@@ -12,6 +12,7 @@
     "validate:supabase": "node --experimental-strip-types scripts/validate-supabase-schema.ts",
     "validate:creem": "node --experimental-strip-types scripts/validate-creem.ts",
     "creem:doctor": "node --experimental-strip-types scripts/creem-doctor.ts",
+    "quality:samples": "node scripts/generate-quality-samples.cjs",
     "generate-previews": "bash scripts/generate-previews.sh",
     "generate-voice-previews": "node --experimental-strip-types scripts/generate-voice-previews.ts",
     "generate-music": "python3 scripts/generate_music.py"

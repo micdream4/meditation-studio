@@ -2,7 +2,7 @@ import { Readable } from "node:stream";
 import { buffer as streamToBuffer } from "node:stream/consumers";
 import { ElevenLabsClient } from "elevenlabs";
 
-import type { Voice } from "@/types/api";
+import type { GenerateRequest, Voice } from "@/types/api";
 import { getOptionalEnv, getRequiredEnv } from "@/lib/env";
 import {
   VOICE_LAB_PRESETS,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/voice-lab";
 
 let elevenLabsClient: ElevenLabsClient | null = null;
+const ELEVENLABS_MAX_ATTEMPTS = 3;
 
 function getElevenLabsClient() {
   if (!elevenLabsClient) {
@@ -21,6 +22,58 @@ function getElevenLabsClient() {
   }
 
   return elevenLabsClient;
+}
+
+type TextToSpeechRequest = Parameters<ElevenLabsClient["textToSpeech"]["convert"]>[1];
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getRetryableElevenLabsStatus(error: unknown) {
+  if (typeof error !== "object" || error === null) {
+    return null;
+  }
+
+  const statusCode = "statusCode" in error ? Number(error.statusCode) : null;
+  return Number.isFinite(statusCode) ? statusCode : null;
+}
+
+function shouldRetryElevenLabsError(error: unknown) {
+  const statusCode = getRetryableElevenLabsStatus(error);
+  if (statusCode && [408, 409, 429, 500, 502, 503, 504].includes(statusCode)) {
+    return true;
+  }
+
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  return (
+    message.includes("fetch failed") ||
+    message.includes("timed out") ||
+    message.includes("timeout") ||
+    message.includes("temporarily")
+  );
+}
+
+async function convertTextToSpeechWithRetry(
+  voiceId: string,
+  request: TextToSpeechRequest,
+) {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= ELEVENLABS_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await getElevenLabsClient().textToSpeech.convert(voiceId, request);
+    } catch (error) {
+      lastError = error;
+      if (attempt === ELEVENLABS_MAX_ATTEMPTS || !shouldRetryElevenLabsError(error)) {
+        throw error;
+      }
+
+      await wait(600 * attempt);
+    }
+  }
+
+  throw lastError;
 }
 
 type VoiceEnvConfig = {
@@ -63,6 +116,14 @@ const EXCLUDED_VOICE_TERMS = [
   "crime",
   "news",
   "advertising",
+  "affirmation",
+  "manifest",
+  "romantic",
+] as const;
+
+const STYLE_RISK_VOICE_TERMS = [
+  "asmr",
+  "sleep",
 ] as const;
 
 export const CACHED_MEDITATION_LIBRARY_VOICES: Voice[] = [
@@ -151,11 +212,14 @@ function scoreMeditationVoice(voice: SharedVoice) {
   if (text.includes("calm")) relevanceScore += 5;
   if (text.includes("gentle")) relevanceScore += 5;
   if (text.includes("soft")) relevanceScore += 4;
-  if (text.includes("asmr")) relevanceScore += 3;
   if (voice.use_case === "narrative_story") relevanceScore += 4;
 
   if (EXCLUDED_VOICE_TERMS.some((term) => text.includes(term))) {
-    relevanceScore -= 12;
+    relevanceScore -= 24;
+  }
+
+  if (STYLE_RISK_VOICE_TERMS.some((term) => text.includes(term))) {
+    relevanceScore -= 4;
   }
 
   const popularityScore = Math.min(
@@ -263,27 +327,72 @@ export async function listVoices(): Promise<Voice[]> {
 }
 
 export function splitTextIntoChunks(text: string, maxLength = 800) {
-  const normalized = text.replace(/\s+/g, " ").trim();
+  const normalized = text
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   if (normalized.length <= maxLength) {
     return [normalized];
   }
 
   const chunks: string[] = [];
-  let start = 0;
+  const blocks = normalized.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
 
-  while (start < normalized.length) {
-    let end = Math.min(start + maxLength, normalized.length);
+  function pushChunk(value: string) {
+    const chunk = value.trim();
+    if (chunk) chunks.push(chunk);
+  }
 
-    if (end < normalized.length) {
-      const boundary = normalized.lastIndexOf(" ", end);
-      if (boundary > start + Math.floor(maxLength * 0.6)) {
-        end = boundary;
+  function splitOversizedBlock(block: string) {
+    const sentenceParts = block
+      .split(/([.!?]+|\.\.\.\s*\.\.\.\s*\.\.\.)\s+/)
+      .reduce<string[]>((parts, part, index, source) => {
+        if (!part.trim()) return parts;
+        if (index % 2 === 1 && parts.length > 0) {
+          parts[parts.length - 1] = `${parts[parts.length - 1]}${part}`;
+        } else if (index % 2 === 0) {
+          const next = source[index + 1];
+          parts.push(next && /^[.!?]+|\.\.\./.test(next) ? part.trim() : part.trim());
+        }
+        return parts;
+      }, [])
+      .filter(Boolean);
+
+    let current = "";
+    for (const sentence of sentenceParts.length > 0 ? sentenceParts : block.split(/\s+/)) {
+      const candidate = current ? `${current} ${sentence}` : sentence;
+      if (candidate.length > maxLength && current.length > 0) {
+        pushChunk(current);
+        current = sentence;
+      } else if (candidate.length > maxLength) {
+        pushChunk(candidate.slice(0, maxLength));
+        current = candidate.slice(maxLength);
+      } else {
+        current = candidate;
       }
     }
-
-    chunks.push(normalized.slice(start, end).trim());
-    start = end;
+    pushChunk(current);
   }
+
+  let current = "";
+  for (const block of blocks) {
+    if (block.length > maxLength) {
+      pushChunk(current);
+      current = "";
+      splitOversizedBlock(block);
+      continue;
+    }
+
+    const candidate = current ? `${current}\n\n${block}` : block;
+    if (candidate.length > maxLength) {
+      pushChunk(current);
+      current = block;
+    } else {
+      current = candidate;
+    }
+  }
+  pushChunk(current);
 
   return chunks.filter(Boolean);
 }
@@ -291,9 +400,12 @@ export function splitTextIntoChunks(text: string, maxLength = 800) {
 function normalizePauseMarkers(text: string): string {
   // ElevenLabs does not use SSML here, so punctuation is the safest portable pause cue.
   return text
-    .replace(/\s*\[pause\]\s*/gi, " ... ... ... ... ")
-    .replace(/([.!?])\s+(?=[A-Z])/g, "$1 ... ... ")
-    .replace(/\s+/g, " ")
+    .replace(/\r\n/g, "\n")
+    .replace(/\s*\[pause short\]\s*/gi, "\n\n... ...\n\n")
+    .replace(/\s*\[pause long\]\s*/gi, "\n\n... ... ... ... ...\n\n")
+    .replace(/\s*\[pause\]\s*/gi, "\n\n... ... ...\n\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
@@ -303,29 +415,77 @@ function getMeditationSpeed(speechRate?: "slow" | "normal" | "fast") {
   return 0.64;
 }
 
-function getMeditationVoiceSettings(speechRate?: "slow" | "normal" | "fast"): VoiceLabSettings {
+function getProductionVoiceBaseSettings(input?: GenerateRequest["input"]): VoiceLabSettings {
+  if (input?.mode === "template") {
+    switch (input.theme) {
+      case "sleep-wind-down":
+      case "body-scan":
+        return { ...VOICE_LAB_PRESETS[2]!.settings, speed: 0.62 };
+      case "focus-reset":
+      case "morning-reset":
+        return { ...VOICE_LAB_PRESETS[2]!.settings, speed: 0.7 };
+      case "loving-kindness":
+      case "emotional-soothing":
+        return { ...VOICE_LAB_PRESETS[1]!.settings, style: 0.46, speed: 0.64 };
+      case "anxiety-release":
+      case "breathing":
+        return { ...VOICE_LAB_PRESETS[0]!.settings, stability: 0.5, style: 0.28 };
+    }
+  }
+
+  if (input?.mode === "mood") {
+    switch (input.mood) {
+      case "sleepless":
+      case "tired":
+        return { ...VOICE_LAB_PRESETS[2]!.settings, speed: 0.62 };
+      case "unfocused":
+        return { ...VOICE_LAB_PRESETS[2]!.settings, speed: 0.7 };
+      case "low":
+        return { ...VOICE_LAB_PRESETS[0]!.settings, stability: 0.52, style: 0.28 };
+      case "anxious":
+      case "other":
+        return { ...VOICE_LAB_PRESETS[0]!.settings, stability: 0.5, style: 0.28 };
+    }
+  }
+
+  return VOICE_LAB_PRESETS[0]!.settings;
+}
+
+function getMeditationVoiceSettings(input?: GenerateRequest["input"]): VoiceLabSettings {
+  const speechRate = input?.mode === "template" ? input.speechRate : undefined;
+  const baseSettings = getProductionVoiceBaseSettings(input);
   return {
-    ...VOICE_LAB_PRESETS[0]!.settings,
-    speed: getMeditationSpeed(speechRate),
+    ...baseSettings,
+    speed: speechRate ? getMeditationSpeed(speechRate) : baseSettings.speed,
   };
+}
+
+function getElevenLabsVoiceSettings(settings: VoiceLabSettings) {
+  const { speed, ...compatibleSettings } = settings;
+
+  if (getOptionalEnv("ELEVENLABS_ENABLE_SPEED_CONTROL") === "true") {
+    return { ...compatibleSettings, speed };
+  }
+
+  return compatibleSettings;
 }
 
 export async function synthesizeSpeechSegments(
   text: string,
   voiceId: string,
-  speechRate?: "slow" | "normal" | "fast",
+  input?: GenerateRequest["input"],
 ) {
-  const chunks = splitTextIntoChunks(normalizePauseMarkers(text));
+  const chunks = splitTextIntoChunks(normalizePauseMarkers(text), 1600);
   const buffers: Buffer[] = [];
 
   for (const [index, chunk] of chunks.entries()) {
-    const audioStream = await getElevenLabsClient().textToSpeech.convert(voiceId, {
+    const audioStream = await convertTextToSpeechWithRetry(voiceId, {
       text: chunk,
       model_id: getOptionalEnv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")!,
       output_format: "mp3_44100_128",
       previous_text: chunks[index - 1],
       next_text: chunks[index + 1],
-      voice_settings: getMeditationVoiceSettings(speechRate),
+      voice_settings: getElevenLabsVoiceSettings(getMeditationVoiceSettings(input)),
     });
 
     buffers.push(Buffer.from(await streamToBuffer(audioStream as Readable)));
@@ -337,17 +497,17 @@ export async function synthesizeSpeechSegments(
 export async function synthesizeVoicePreview(voiceId: string) {
   const previewText =
     "Take a slow breath in. And gently let it go. Allow your attention to settle here.";
-  const audioStream = await getElevenLabsClient().textToSpeech.convert(voiceId, {
+  const audioStream = await convertTextToSpeechWithRetry(voiceId, {
     text: previewText,
     model_id: getOptionalEnv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")!,
     output_format: "mp3_44100_128",
-    voice_settings: {
+    voice_settings: getElevenLabsVoiceSettings({
       stability: 0.5,
       similarity_boost: 0.7,
       style: 0.35,
       use_speaker_boost: true,
       speed: 0.68,
-    },
+    }),
   });
 
   return Buffer.from(await streamToBuffer(audioStream as Readable));
@@ -368,11 +528,11 @@ export async function synthesizeVoiceLabSample({
     throw new Error("Unknown voice lab preset.");
   }
 
-  const audioStream = await getElevenLabsClient().textToSpeech.convert(voiceId, {
+  const audioStream = await convertTextToSpeechWithRetry(voiceId, {
     text: normalizePauseMarkers(text),
     model_id: getOptionalEnv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")!,
     output_format: "mp3_44100_128",
-    voice_settings: preset.settings,
+    voice_settings: getElevenLabsVoiceSettings(preset.settings),
   });
 
   return Buffer.from(await streamToBuffer(audioStream as Readable));

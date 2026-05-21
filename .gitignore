@@ -26,6 +26,7 @@
 .playwright-cli/
 output/
 /audio/
+.tmp/
 
 # debug
 npm-debug.log*

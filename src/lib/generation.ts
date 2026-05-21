@@ -14,6 +14,7 @@ import {
   generateMeditationScript,
   getSafetyBlockMessage,
 } from "@/lib/openrouter";
+import { prepareMeditationScriptForAudio } from "@/lib/script-quality";
 import { getGeneratedAudioPath, AUDIO_BUCKET, getStorageUrl } from "@/lib/storage";
 import { consumeGenerationCredits, getGenerationCreditCost } from "@/lib/credits";
 
@@ -151,7 +152,11 @@ export async function processGeneration(
       };
     }
 
-    const scriptText = await generateMeditationScript(request.input);
+    const rawScriptText = await generateMeditationScript(request.input);
+    const { script: scriptText } = prepareMeditationScriptForAudio(
+      rawScriptText,
+      request.input,
+    );
     return await markGenerationScriptReady(userId, generationId, scriptText);
   } catch (error) {
     return await markGenerationFailed(admin, userId, generationId, error);
@@ -197,7 +202,7 @@ export async function finalizeGenerationAudio(
     const audioBuffer = await synthesizeSpeechSegments(
       scriptText,
       request.voiceId,
-      request.input.mode === "template" ? request.input.speechRate : "slow",
+      request.input,
     );
 
     const storagePath = getGeneratedAudioPath(userId, generationId);
